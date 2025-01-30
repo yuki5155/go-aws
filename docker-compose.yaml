@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  localstack:
+    container_name: localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"  # LocalStack Gateway
+    environment:
+      - SERVICES=dynamodb,s3,cognito
+      - DEFAULT_REGION=ap-northeast-1
+      - AWS_DEFAULT_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID=localstack
+      - AWS_SECRET_ACCESS_KEY=localstack
+      - PERSISTENCE=1
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  init-aws:
+    image: amazon/aws-cli
+    environment:
+      - AWS_ACCESS_KEY_ID=localstack
+      - AWS_SECRET_ACCESS_KEY=localstack
+      - AWS_DEFAULT_REGION=ap-northeast-1
+    entrypoint: /bin/sh
+    command: >
+      -c '
+      sleep 10;
+      aws --endpoint-url=http://localstack:4566 dynamodb create-table \
+        --table-name Users \
+        --attribute-definitions AttributeName=id,AttributeType=S \
+        --key-schema AttributeName=id,KeyType=HASH \
+        --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5;
+      aws --endpoint-url=http://localstack:4566 s3 mb s3://my-bucket;
+      '
+    depends_on:
+      localstack:
+        condition: service_healthy
