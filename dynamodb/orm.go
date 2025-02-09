@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// DynamoTagParser カスタムタグのパーサー構造体
 type DynamoTagParser struct {
 	AttributeName string
 	KeyType       string
@@ -21,25 +20,19 @@ type DynamoTagParser struct {
 	Required      bool
 }
 
-// TableNamer テーブル名を提供するインターフェース
 type TableNamer interface {
 	TableName() string
 }
 
-// ParseDynamoTag タグの文字列をパースする関数
 func ParseDynamoTag(tag string) *DynamoTagParser {
 	parser := &DynamoTagParser{}
-
 	if tag == "" {
 		return parser
 	}
-
 	options := strings.Split(tag, ",")
-
 	if len(options) > 0 && options[0] != "" {
 		parser.AttributeName = options[0]
 	}
-
 	for _, opt := range options[1:] {
 		switch {
 		case strings.HasPrefix(opt, "key="):
@@ -50,27 +43,25 @@ func ParseDynamoTag(tag string) *DynamoTagParser {
 			parser.Required = true
 		}
 	}
-
 	return parser
 }
 
-// DynamoDBClient インターフェース
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 }
 
-// Repository DynamoDB操作の構造体
 type Repository struct {
 	client    DynamoDBClient
-	tableName string // デフォルトテーブル名
+	tableName string
 }
 
-// カスタムエラーの定義
 var (
 	ErrDuplicateKey = errors.New("item with this key already exists")
 )
 
-// NewRepository リポジトリのコンストラクタ
 func NewRepository(client DynamoDBClient, defaultTableName string) *Repository {
 	return &Repository{
 		client:    client,
@@ -78,50 +69,33 @@ func NewRepository(client DynamoDBClient, defaultTableName string) *Repository {
 	}
 }
 
-// getTableName テーブル名を取得する関数
 func (r *Repository) getTableName(item interface{}) string {
-	// TableNamerインターフェースが実装されているか確認
 	if tableNamer, ok := item.(TableNamer); ok {
 		return tableNamer.TableName()
 	}
-
-	// ポインタの場合は中身を確認
 	if reflect.ValueOf(item).Kind() == reflect.Ptr {
 		if tableNamer, ok := reflect.ValueOf(item).Elem().Interface().(TableNamer); ok {
 			return tableNamer.TableName()
 		}
 	}
-
-	// インターフェースが実装されていない場合はデフォルトテーブル名を使用
 	return r.tableName
 }
 
-// Create レコードを作成する関数
 func (r *Repository) Create(ctx context.Context, item interface{}) error {
-	// 構造体の検証
 	if err := validateStruct(item); err != nil {
 		return fmt.Errorf("validation error: %w", err)
 	}
-
-	// DynamoDB Item に変換
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
-
-	// テーブル名の取得
 	tableName := r.getTableName(item)
-
-	// 条件式の作成（既存キーがない場合のみ作成）
 	conditionExpression := createConditionExpression(item)
-
 	input := &dynamodb.PutItemInput{
 		TableName:           aws.String(tableName),
 		Item:                av,
 		ConditionExpression: aws.String(conditionExpression),
 	}
-
-	// PutItem実行
 	_, err = r.client.PutItem(ctx, input)
 	if err != nil {
 		var ccf *types.ConditionalCheckFailedException
@@ -130,28 +104,22 @@ func (r *Repository) Create(ctx context.Context, item interface{}) error {
 		}
 		return fmt.Errorf("failed to put item: %w", err)
 	}
-
 	return nil
 }
 
-// validateStruct 構造体の検証
 func validateStruct(v interface{}) error {
 	val := reflect.ValueOf(v)
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
-
 	if val.Kind() != reflect.Struct {
 		return fmt.Errorf("item must be a struct")
 	}
-
 	typ := val.Type()
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
-
 		if tag, ok := field.Tag.Lookup("dynamo"); ok {
 			parser := ParseDynamoTag(tag)
-
 			if parser.Required {
 				fieldValue := val.Field(i)
 				if fieldValue.IsZero() {
@@ -160,20 +128,16 @@ func validateStruct(v interface{}) error {
 			}
 		}
 	}
-
 	return nil
 }
 
-// createConditionExpression 条件式の作成
 func createConditionExpression(v interface{}) string {
 	val := reflect.ValueOf(v)
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
-
 	typ := val.Type()
 	conditions := []string{}
-
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		if tag, ok := field.Tag.Lookup("dynamo"); ok {
@@ -183,10 +147,158 @@ func createConditionExpression(v interface{}) string {
 			}
 		}
 	}
-
 	if len(conditions) == 0 {
 		return ""
 	}
-
 	return strings.Join(conditions, " AND ")
+}
+
+func (r *Repository) FindByID(ctx context.Context, id interface{}, out interface{}) error {
+	tableName := r.getTableName(out)
+	elemType := reflect.TypeOf(out)
+	if elemType.Kind() != reflect.Ptr {
+		return fmt.Errorf("out must be a pointer")
+	}
+	elemType = elemType.Elem()
+	if elemType.Kind() != reflect.Struct {
+		return fmt.Errorf("out must be a pointer to struct")
+	}
+	var keyAttribute string
+	for i := 0; i < elemType.NumField(); i++ {
+		field := elemType.Field(i)
+		if tag, ok := field.Tag.Lookup("dynamo"); ok {
+			parser := ParseDynamoTag(tag)
+			if parser.KeyType == "hash" {
+				keyAttribute = parser.AttributeName
+				break
+			}
+		}
+	}
+	if keyAttribute == "" {
+		return fmt.Errorf("no hash key defined in struct")
+	}
+	av, err := attributevalue.Marshal(id)
+	if err != nil {
+		return fmt.Errorf("failed to marshal key: %w", err)
+	}
+	key := map[string]types.AttributeValue{
+		keyAttribute: av,
+	}
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key:       key,
+	}
+	result, err := r.client.GetItem(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to get item: %w", err)
+	}
+	if result.Item == nil {
+		return fmt.Errorf("item not found")
+	}
+	err = attributevalue.UnmarshalMap(result.Item, out)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal item: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) FindByParameter(ctx context.Context, parameter string, value interface{}, out interface{}) error {
+	outType := reflect.TypeOf(out)
+	if outType.Kind() != reflect.Ptr {
+		return fmt.Errorf("out must be a pointer to slice")
+	}
+	sliceType := outType.Elem()
+	if sliceType.Kind() != reflect.Slice {
+		return fmt.Errorf("out must be a pointer to slice")
+	}
+	elemType := sliceType.Elem()
+	if elemType.Kind() == reflect.Ptr {
+		elemType = elemType.Elem()
+	}
+	if elemType.Kind() != reflect.Struct {
+		return fmt.Errorf("slice element must be a struct")
+	}
+	tableName := r.getTableName(reflect.New(elemType).Interface())
+	var useQuery bool
+	var indexName string
+	for i := 0; i < elemType.NumField(); i++ {
+		field := elemType.Field(i)
+		if tag, ok := field.Tag.Lookup("dynamo"); ok {
+			parser := ParseDynamoTag(tag)
+			if parser.AttributeName == parameter && parser.Index != "" {
+				useQuery = true
+				indexName = parser.Index
+				break
+			}
+		}
+	}
+	marshaledValue, err := attributevalue.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("failed to marshal value: %w", err)
+	}
+	exprAttrValues := map[string]types.AttributeValue{
+		":v": marshaledValue,
+	}
+	if useQuery {
+		input := &dynamodb.QueryInput{
+			TableName:                 aws.String(tableName),
+			IndexName:                 aws.String(indexName),
+			KeyConditionExpression:    aws.String(fmt.Sprintf("%s = :v", parameter)),
+			ExpressionAttributeValues: exprAttrValues,
+		}
+		result, err := r.client.Query(ctx, input)
+		if err != nil {
+			return fmt.Errorf("failed to query: %w", err)
+		}
+		err = attributevalue.UnmarshalListOfMaps(result.Items, out)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal query result: %w", err)
+		}
+	} else {
+		input := &dynamodb.ScanInput{
+			TableName:                 aws.String(tableName),
+			FilterExpression:          aws.String(fmt.Sprintf("%s = :v", parameter)),
+			ExpressionAttributeValues: exprAttrValues,
+		}
+		result, err := r.client.Scan(ctx, input)
+		if err != nil {
+			return fmt.Errorf("failed to scan: %w", err)
+		}
+		err = attributevalue.UnmarshalListOfMaps(result.Items, out)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal scan result: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *Repository) GetAll(ctx context.Context, out interface{}) error {
+	outType := reflect.TypeOf(out)
+	if outType.Kind() != reflect.Ptr {
+		return fmt.Errorf("out must be a pointer to slice")
+	}
+	sliceType := outType.Elem()
+	if sliceType.Kind() != reflect.Slice {
+		return fmt.Errorf("out must be a pointer to slice")
+	}
+	elemType := sliceType.Elem()
+	if elemType.Kind() == reflect.Ptr {
+		elemType = elemType.Elem()
+	}
+	if elemType.Kind() != reflect.Struct {
+		return fmt.Errorf("slice element must be a struct")
+	}
+	tableName := r.getTableName(reflect.New(elemType).Interface())
+	input := &dynamodb.ScanInput{
+		TableName: aws.String(tableName),
+	}
+	result, err := r.client.Scan(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to scan: %w", err)
+	}
+	err = attributevalue.UnmarshalListOfMaps(result.Items, out)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal scan result: %w", err)
+	}
+	return nil
 }
