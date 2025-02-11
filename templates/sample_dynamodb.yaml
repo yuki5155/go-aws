@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB table with GSI for Users'
+
+Parameters:
+ Environment:
+   Type: String
+   Default: dev
+   AllowedValues:
+     - dev
+     - stg
+     - prd
+   Description: Environment name
+
+Resources:
+ UsersTable:
+   Type: AWS::DynamoDB::Table
+   Properties:
+     TableName: !Sub Users-${Environment}
+     BillingMode: PAY_PER_REQUEST
+     AttributeDefinitions:
+       - AttributeName: id
+         AttributeType: S
+       - AttributeName: email
+         AttributeType: S
+       - AttributeName: name
+         AttributeType: S
+     KeySchema:
+       - AttributeName: id
+         KeyType: HASH
+     GlobalSecondaryIndexes:
+       - IndexName: email-index
+         KeySchema:
+           - AttributeName: email
+             KeyType: HASH
+         Projection:
+           ProjectionType: ALL
+       - IndexName: name-index
+         KeySchema:
+           - AttributeName: name 
+             KeyType: HASH
+         Projection:
+           ProjectionType: ALL
+     Tags:
+       - Key: Environment
+         Value: !Ref Environment
+
+Outputs:
+ TableName:
+   Description: Name of the DynamoDB table
+   Value: !Ref UsersTable
+ TableArn:
+   Description: ARN of the DynamoDB table
+   Value: !GetAtt UsersTable.Arn
