@@ -50,13 +50,13 @@ func ParseDynamoTag(tag string) *DynamoTagParser {
 }
 
 // DynamoDBClient is used by the repository to interface with DynamoDB.
-// Note: the UpdateItem method has been added.
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
 }
 
 // Repository implements basic CRUD operations using DynamoDB.
@@ -408,6 +408,38 @@ func (r *Repository) Update(ctx context.Context, item interface{}) error {
 			return ErrNotFound
 		}
 		return fmt.Errorf("failed to update item: %w", err)
+	}
+	return nil
+}
+
+// Delete deletes an item from DynamoDB by its primary key id (assumed to be of type string).
+// This method assumes that the primary key attribute in the table is named "id".
+// A conditional expression is used to ensure that the item exists.
+func (r *Repository) Delete(ctx context.Context, id string) error {
+	// Marshal the id value.
+	idAttr, err := attributevalue.Marshal(id)
+	if err != nil {
+		return fmt.Errorf("failed to marshal key: %w", err)
+	}
+
+	// Build the key map – here we assume the primary key attribute is "id".
+	key := map[string]types.AttributeValue{
+		"id": idAttr,
+	}
+
+	input := &dynamodb.DeleteItemInput{
+		TableName:           aws.String(r.tableName),
+		Key:                 key,
+		ConditionExpression: aws.String("attribute_exists(id)"),
+	}
+
+	_, err = r.client.DeleteItem(ctx, input)
+	if err != nil {
+		var ccf *types.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to delete item: %w", err)
 	}
 	return nil
 }

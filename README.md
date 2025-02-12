@@ -114,3 +114,18 @@ if err != nil {
 ```
 
 If the record does not exist, the Update method returns an error (for example, ErrNotFound). Also, if no updatable fields are found, it will return an error.
+
+---
+
+## Delete
+
+Delete an item from DynamoDB by its primary key id (assumed to be a string). The `Delete` method uses a conditional expression to ensure that the item exists before attempting deletion.
+
+```go
+err = repo.Delete(context.Background(), "your_id")
+if err != nil {
+    log.Fatalf("failed to delete record: %v", err)
+}
+```
+
+In this example, the primary key attribute is assumed to have the name "id". If the specified item doesn’t exist, the method returns an error (e.g., ErrNotFound).
