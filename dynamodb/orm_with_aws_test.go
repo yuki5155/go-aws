@@ -198,3 +198,25 @@ func TestAws_UpdateUser(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Println("Updated User:", updatedUser)
 }
+
+func TestAws_DeleteUser(t *testing.T) {
+	if err := loadEnv("../.env"); err != nil {
+		t.Fatal(err)
+	}
+
+	client := setupAwsDynamoDBClient(t)
+	repo := db.NewRepository(client, "Users-dev")
+
+	var user UserDev
+	err := repo.FindByID(context.Background(), "valid-20250205134058.186", &user)
+	assert.NoError(t, err)
+	fmt.Println("User:", user)
+
+	err = repo.Delete(context.Background(), user.ID)
+	assert.NoError(t, err)
+
+	var deletedUser UserDev
+	err = repo.FindByID(context.Background(), "valid-20250205134058.186", &deletedUser)
+	assert.Error(t, err)
+	fmt.Println("Deleted User:", deletedUser)
+}
