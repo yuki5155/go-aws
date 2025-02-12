@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+// DynamoTagParser holds parsed values from the `dynamo` struct tag.
 type DynamoTagParser struct {
 	AttributeName string
 	KeyType       string
@@ -20,10 +21,12 @@ type DynamoTagParser struct {
 	Required      bool
 }
 
+// TableNamer should be implemented by items which specify their own table name.
 type TableNamer interface {
 	TableName() string
 }
 
+// ParseDynamoTag parses a struct field tag and returns a parser.
 func ParseDynamoTag(tag string) *DynamoTagParser {
 	parser := &DynamoTagParser{}
 	if tag == "" {
@@ -46,13 +49,17 @@ func ParseDynamoTag(tag string) *DynamoTagParser {
 	return parser
 }
 
+// DynamoDBClient is used by the repository to interface with DynamoDB.
+// Note: the UpdateItem method has been added.
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 }
 
+// Repository implements basic CRUD operations using DynamoDB.
 type Repository struct {
 	client    DynamoDBClient
 	tableName string
@@ -60,8 +67,10 @@ type Repository struct {
 
 var (
 	ErrDuplicateKey = errors.New("item with this key already exists")
+	ErrNotFound     = errors.New("item not found")
 )
 
+// NewRepository returns a new Repository.
 func NewRepository(client DynamoDBClient, defaultTableName string) *Repository {
 	return &Repository{
 		client:    client,
@@ -69,6 +78,7 @@ func NewRepository(client DynamoDBClient, defaultTableName string) *Repository {
 	}
 }
 
+// getTableName returns the table name for an item. It checks if the item implements TableNamer.
 func (r *Repository) getTableName(item interface{}) string {
 	if tableNamer, ok := item.(TableNamer); ok {
 		return tableNamer.TableName()
@@ -81,6 +91,7 @@ func (r *Repository) getTableName(item interface{}) string {
 	return r.tableName
 }
 
+// Create stores an item in DynamoDB.
 func (r *Repository) Create(ctx context.Context, item interface{}) error {
 	if err := validateStruct(item); err != nil {
 		return fmt.Errorf("validation error: %w", err)
@@ -107,6 +118,7 @@ func (r *Repository) Create(ctx context.Context, item interface{}) error {
 	return nil
 }
 
+// validateStruct ensures that required fields (as specified by the `dynamo` tag) are non-zero.
 func validateStruct(v interface{}) error {
 	val := reflect.ValueOf(v)
 	if val.Kind() == reflect.Ptr {
@@ -131,6 +143,8 @@ func validateStruct(v interface{}) error {
 	return nil
 }
 
+// createConditionExpression builds a condition expression that checks for non-existence of key attributes.
+// This is used during Create to protect against duplicate keys.
 func createConditionExpression(v interface{}) string {
 	val := reflect.ValueOf(v)
 	if val.Kind() == reflect.Ptr {
@@ -153,6 +167,7 @@ func createConditionExpression(v interface{}) string {
 	return strings.Join(conditions, " AND ")
 }
 
+// FindByID retrieves an item by its key.
 func (r *Repository) FindByID(ctx context.Context, id interface{}, out interface{}) error {
 	tableName := r.getTableName(out)
 	elemType := reflect.TypeOf(out)
@@ -202,6 +217,9 @@ func (r *Repository) FindByID(ctx context.Context, id interface{}, out interface
 	return nil
 }
 
+// FindByParameter retrieves items by a given parameter value.
+// It uses a Query if an index exists for the parameter
+// and a Scan otherwise.
 func (r *Repository) FindByParameter(ctx context.Context, parameter string, value interface{}, out interface{}) error {
 	outType := reflect.TypeOf(out)
 	if outType.Kind() != reflect.Ptr {
@@ -272,6 +290,7 @@ func (r *Repository) FindByParameter(ctx context.Context, parameter string, valu
 	return nil
 }
 
+// GetAll retrieves all items from a table.
 func (r *Repository) GetAll(ctx context.Context, out interface{}) error {
 	outType := reflect.TypeOf(out)
 	if outType.Kind() != reflect.Ptr {
@@ -299,6 +318,96 @@ func (r *Repository) GetAll(ctx context.Context, out interface{}) error {
 	err = attributevalue.UnmarshalListOfMaps(result.Items, out)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal scan result: %w", err)
+	}
+	return nil
+}
+
+// Update updates an existing item in DynamoDB. It:
+//  1. Uses reflection to extract the key field (the one with `key=hash`).
+//  2. Builds an UpdateExpression with all other fields tagged with `dynamo`.
+//  3. Uses a ConditionExpression to ensure the item exists.
+//
+// If no updatable field is found or if the key is missing the update will return an error.
+func (r *Repository) Update(ctx context.Context, item interface{}) error {
+	// Get the underlying struct value.
+	val := reflect.ValueOf(item)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return fmt.Errorf("item must be a struct")
+	}
+	tableName := r.getTableName(item)
+
+	var keyAttr string
+	keyMap := make(map[string]types.AttributeValue)
+	updateExpressions := []string{}
+	exprAttrNames := make(map[string]string)
+	exprAttrValues := make(map[string]types.AttributeValue)
+
+	typ := val.Type()
+	// Walk through all struct fields.
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fieldValue := val.Field(i)
+		tag, ok := field.Tag.Lookup("dynamo")
+		if !ok {
+			continue
+		}
+		parser := ParseDynamoTag(tag)
+		if parser.AttributeName == "" {
+			continue
+		}
+		if parser.KeyType == "hash" {
+			// Mark this as the key field.
+			keyAttr = parser.AttributeName
+			marshaledVal, err := attributevalue.Marshal(fieldValue.Interface())
+			if err != nil {
+				return fmt.Errorf("failed to marshal key field %s: %w", field.Name, err)
+			}
+			keyMap[keyAttr] = marshaledVal
+		} else {
+			// Build update expression part for non-key fields.
+			placeholderName := "#" + parser.AttributeName
+			placeholderValue := ":" + parser.AttributeName
+			updateExpressions = append(updateExpressions, fmt.Sprintf("%s = %s", placeholderName, placeholderValue))
+			exprAttrNames[placeholderName] = parser.AttributeName
+			marshaledVal, err := attributevalue.Marshal(fieldValue.Interface())
+			if err != nil {
+				return fmt.Errorf("failed to marshal field %s: %w", field.Name, err)
+			}
+			exprAttrValues[placeholderValue] = marshaledVal
+		}
+	}
+	if keyAttr == "" {
+		return fmt.Errorf("no hash key defined in struct")
+	}
+	if len(updateExpressions) == 0 {
+		return fmt.Errorf("no updatable fields found")
+	}
+	updateExpr := "SET " + strings.Join(updateExpressions, ", ")
+
+	// Add a condition to ensure that the item exists.
+	keyPlaceholder := "#k"
+	exprAttrNames[keyPlaceholder] = keyAttr
+	conditionExpr := fmt.Sprintf("attribute_exists(%s)", keyPlaceholder)
+
+	input := &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       keyMap,
+		UpdateExpression:          aws.String(updateExpr),
+		ExpressionAttributeNames:  exprAttrNames,
+		ExpressionAttributeValues: exprAttrValues,
+		ConditionExpression:       aws.String(conditionExpr),
+	}
+
+	_, err := r.client.UpdateItem(ctx, input)
+	if err != nil {
+		var ccf *types.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to update item: %w", err)
 	}
 	return nil
 }

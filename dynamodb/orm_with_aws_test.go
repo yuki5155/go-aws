@@ -175,3 +175,26 @@ func TestAWS_GetbyEmail(t *testing.T) {
 		fmt.Println("User:", users[0])
 	}
 }
+
+func TestAws_UpdateUser(t *testing.T) {
+	if err := loadEnv("../.env"); err != nil {
+		t.Fatal(err)
+	}
+
+	client := setupAwsDynamoDBClient(t)
+	repo := db.NewRepository(client, "Users-dev")
+
+	var user UserDev
+	err := repo.FindByID(context.Background(), "valid-20250205134058.186", &user)
+	assert.NoError(t, err)
+	fmt.Println("User:", user)
+
+	user.Name = "Updated User"
+	err = repo.Update(context.Background(), user)
+	assert.NoError(t, err)
+
+	var updatedUser UserDev
+	err = repo.FindByID(context.Background(), "valid-20250205134058.186", &updatedUser)
+	assert.NoError(t, err)
+	fmt.Println("Updated User:", updatedUser)
+}
