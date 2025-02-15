@@ -16,15 +16,16 @@ Parameters:
 
   CustomDomainName:
     Type: String
-    Default: example.com
     Description: Custom domain name
 
   HostedZoneId:
     Type: String
-    Default: Z1234567890
     Description: Hosted zone ID
 
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+  CertificateArn:
+    Type: String
+    Description: ARN of existing ACM certificate
+
 Globals:
   Function:
     Timeout: 5
@@ -32,10 +33,59 @@ Globals:
     Tracing: Active
   Api:
     TracingEnabled: true
+    OpenApiVersion: '2.0'
+    EndpointConfiguration: REGIONAL
 
 Resources:
+  # Custom domain
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref CustomDomainName
+      RegionalCertificateArn: !Ref CertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      SecurityPolicy: TLS_1_2
+
+  # API Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref ServerlessRestApi
+      StageName: !Ref Environment
+
+  # API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: HelloWorldFunction
+    Properties:
+      RestApiId: !Ref ServerlessRestApi
+
+  # Base path mapping
+  ApiBasePath:
+    Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: 
+      - ApiStage
+    Properties:
+      DomainName: !Ref CustomDomainName
+      RestApiId: !Ref ServerlessRestApi
+      Stage: !Ref Environment
+
+  # DNS A Record
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref CustomDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
+
   HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
     Properties:
@@ -43,7 +93,7 @@ Resources:
       Handler: bootstrap
       Runtime: provided.al2
       Architectures:
-      - x86_64
+        - x86_64
       Events:
         CatchAll:
           Type: Api 
@@ -65,6 +115,7 @@ Resources:
           - Ref: AWS::StackName
       ResourceQuery:
         Type: CLOUDFORMATION_STACK_1_0
+
   ApplicationInsightsMonitoring:
     Type: AWS::ApplicationInsights::Application
     Properties:
@@ -76,40 +127,19 @@ Resources:
       AutoConfigurationEnabled: 'true'
     DependsOn: ApplicationResourceGroup
 
-  #--------------------------------------#
-  #  API Gateway
-  #--------------------------------------#
-  # ApiGatewayApi:
-  #   Type: AWS::Serverless::Api
-  #   Properties:
-  #     StageName: Prod
-  
-  # Certificate:
-  #   Type: AWS::CertificateManager::Certificate
-  #   Properties:
-  #     DomainName: !Ref CustomDomainName
-  #     ValidationMethod: DNS
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
 
-  # ApiGatewayCustomDomain:
-  #   Type: AWS::ApiGateway::DomainName
-  #   Properties:
-  #     DomainName: !Ref CustomDomainName
-  #     CertificateArn: !Ref Certificate
-  
-  # ApiGatewayBasePathMapping:
-  #   Type: AWS::ApiGateway::BasePathMapping
-  #   Properties:
-  #     DomainName: !Ref ApiGatewayCustomDomain
-  #     RestApiId: !Ref ApiGatewayApi
-  #     Stage: Prod
-  
-  # DNSRecord:
-  #   Type: AWS::Route53::RecordSet
-  #   Properties:
-  #     HostedZoneId: !Ref HostedZoneId
-  #     Name: !Ref CustomDomainName
-  #     Type: A
-  #     AliasTarget:
-  #       DNSName: !GetAtt ApiGatewayCustomDomain.DistributionDomainName
-  #       HostedZoneId: Z2FDTNDATAQYW2
+  CustomDomainUrl:
+    Description: Custom domain URL
+    Value: !Sub https://${CustomDomainName}/
 
+  ApiGatewayRestApiId:
+    Description: API Gateway REST API ID
+    Value: !Ref ServerlessRestApi
+
+  ApiGatewayRestApiStage:
+    Description: API Gateway REST API Stage
+    Value: !Ref Environment
