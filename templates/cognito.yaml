@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cognito User Pool and Identity Pool with Hosted UI
+
+Parameters:
+  UserPoolName:
+    Type: String
+    Default: MyCognitoUserPool
+    Description: Name of the Cognito User Pool
+  
+  IdentityPoolName:
+    Type: String
+    Default: MyCognitoIdentityPool
+    Description: Name of the Cognito Identity Pool
+  
+  CognitoDomainPrefix:
+    Type: String
+    Description: Prefix for your Cognito domain (must be unique)
+  
+  CallbackURL:
+    Type: String
+    Default: https://example.com/callback
+    Description: Callback URL after login
+  
+  LogoutURL:
+    Type: String
+    Default: https://example.com/logout
+    Description: Logout URL
+
+Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref UserPoolName
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+      MfaConfiguration: 'OFF'
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref CognitoUserPool
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: UserPoolClient
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - phone
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - !Ref CallbackURL
+      LogoutURLs:
+        - !Ref LogoutURL
+      PreventUserExistenceErrors: ENABLED
+
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Ref IdentityPoolName
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref CognitoUserPoolClient
+          ProviderName: !Sub cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}
+          ServerSideTokenCheck: true
+
+  CognitoAuthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
+              ForAnyValue:StringLike:
+                cognito-identity.amazonaws.com:amr: authenticated
+      Policies:
+        - PolicyName: AuthenticatedPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-sync:*
+                  - cognito-identity:*
+                  - execute-api:Invoke
+                Resource: '*'
+
+  CognitoUnauthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
+              ForAnyValue:StringLike:
+                cognito-identity.amazonaws.com:amr: unauthenticated
+      Policies:
+        - PolicyName: UnauthenticatedPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-sync:*
+                Resource: '*'
+
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref CognitoIdentityPool
+      Roles:
+        authenticated: !GetAtt CognitoAuthenticatedRole.Arn
+        unauthenticated: !GetAtt CognitoUnauthenticatedRole.Arn
+
+  UserPoolUICustomization:
+    Type: AWS::Cognito::UserPoolUICustomizationAttachment
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientId: !Ref CognitoUserPoolClient
+      CSS: |
+        .banner-customizable { 
+          background-color: #ffffff;
+        }
+        .label-customizable {
+          font-weight: 400;
+        }
+        .textDescription-customizable {
+          padding-top: 10px;
+          padding-bottom: 10px;
+          display: block;
+        }
+        .idpButton-customizable {
+          margin-bottom: 15px;
+        }
+        .submitButton-customizable {
+          background-color: #2d72da;
+          border-color: #2d72da;
+        }
+        .submitButton-customizable:hover {
+          background-color: #1b5cc5;
+          border-color: #1b5cc5;
+        }
+
+Outputs:
+  UserPoolId:
+    Value: !Ref CognitoUserPool
+    Description: User Pool ID
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolId
+
+  UserPoolClientId:
+    Value: !Ref CognitoUserPoolClient
+    Description: User Pool Client ID
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolClientId
+
+  IdentityPoolId:
+    Value: !Ref CognitoIdentityPool
+    Description: Identity Pool ID
+    Export:
+      Name: !Sub ${AWS::StackName}-IdentityPoolId
+
+  UserPoolDomain:
+    Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com
+    Description: Hosted UI Domain
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolDomain
+
+  HostedUIURL:
+    Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/login?client_id=${CognitoUserPoolClient}&response_type=code&redirect_uri=${CallbackURL}
+    Description: Complete Hosted UI Login URL
