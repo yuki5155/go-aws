@@ -115,7 +115,7 @@ Resources:
         - aws.cognito.signin.user.admin
       AllowedOAuthFlowsUserPoolClient: true
       SupportedIdentityProviders:
-        - COGNITO
+        - COGNITO # googleのみにしたい場合はここをコメントアウト
         - Google
       CallbackURLs:
         - !Ref CallbackURL
