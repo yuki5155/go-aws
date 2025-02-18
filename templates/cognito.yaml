@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Cognito User Pool and Identity Pool with Hosted UI
+Description: Cognito User Pool and Identity Pool with Google Authentication
 
 Parameters:
   UserPoolName:
@@ -14,7 +14,9 @@ Parameters:
   
   CognitoDomainPrefix:
     Type: String
-    Description: Prefix for your Cognito domain (must be unique)
+    Description: Prefix for your Cognito domain (must be globally unique, only lowercase alphanumeric)
+    AllowedPattern: '^[a-z0-9]{3,63}$'
+    ConstraintDescription: Domain prefix must contain 3-63 lowercase alphanumeric characters
   
   CallbackURL:
     Type: String
@@ -25,6 +27,16 @@ Parameters:
     Type: String
     Default: https://example.com/logout
     Description: Logout URL
+  
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth Client ID
+    NoEcho: true
+  
+  GoogleClientSecret:
+    Type: String
+    Description: Google OAuth Client Secret
+    NoEcho: true
 
 Resources:
   CognitoUserPool:
@@ -37,7 +49,7 @@ Resources:
         - email
       VerificationMessageTemplate:
         DefaultEmailOption: CONFIRM_WITH_CODE
-      MfaConfiguration: 'OFF'
+      MfaConfiguration: "OFF"
       Policies:
         PasswordPolicy:
           MinimumLength: 8
@@ -57,12 +69,34 @@ Resources:
 
   CognitoUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
+    DependsOn: CognitoUserPool
     Properties:
       Domain: !Ref CognitoDomainPrefix
       UserPoolId: !Ref CognitoUserPool
 
+  UserPoolIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    DependsOn: CognitoUserPool
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: email profile openid
+      AttributeMapping:
+        email: email
+        name: name
+        given_name: given_name
+        family_name: family_name
+        picture: picture
+
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
+    DependsOn: 
+      - CognitoUserPool
+      - UserPoolIdentityProvider
     Properties:
       ClientName: UserPoolClient
       UserPoolId: !Ref CognitoUserPool
@@ -75,7 +109,6 @@ Resources:
         - code
         - implicit
       AllowedOAuthScopes:
-        - phone
         - email
         - openid
         - profile
@@ -83,6 +116,7 @@ Resources:
       AllowedOAuthFlowsUserPoolClient: true
       SupportedIdentityProviders:
         - COGNITO
+        - Google
       CallbackURLs:
         - !Ref CallbackURL
       LogoutURLs:
@@ -91,6 +125,7 @@ Resources:
 
   CognitoIdentityPool:
     Type: AWS::Cognito::IdentityPool
+    DependsOn: CognitoUserPoolClient
     Properties:
       IdentityPoolName: !Ref IdentityPoolName
       AllowUnauthenticatedIdentities: false
@@ -111,9 +146,9 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
-                cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
-              ForAnyValue:StringLike:
-                cognito-identity.amazonaws.com:amr: authenticated
+                'cognito-identity.amazonaws.com:aud': !Ref CognitoIdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': authenticated
       Policies:
         - PolicyName: AuthenticatedPolicy
           PolicyDocument:
@@ -121,9 +156,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - cognito-sync:*
-                  - cognito-identity:*
-                  - execute-api:Invoke
+                  - 'cognito-sync:*'
+                  - 'cognito-identity:*'
+                  - 'execute-api:Invoke'
                 Resource: '*'
 
   CognitoUnauthenticatedRole:
@@ -138,9 +173,9 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
-                cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
-              ForAnyValue:StringLike:
-                cognito-identity.amazonaws.com:amr: unauthenticated
+                'cognito-identity.amazonaws.com:aud': !Ref CognitoIdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': unauthenticated
       Policies:
         - PolicyName: UnauthenticatedPolicy
           PolicyDocument:
@@ -148,45 +183,20 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - cognito-sync:*
+                  - 'cognito-sync:*'
                 Resource: '*'
 
   IdentityPoolRoleAttachment:
     Type: AWS::Cognito::IdentityPoolRoleAttachment
+    DependsOn: 
+      - CognitoIdentityPool
+      - CognitoAuthenticatedRole
+      - CognitoUnauthenticatedRole
     Properties:
       IdentityPoolId: !Ref CognitoIdentityPool
       Roles:
         authenticated: !GetAtt CognitoAuthenticatedRole.Arn
         unauthenticated: !GetAtt CognitoUnauthenticatedRole.Arn
-
-  UserPoolUICustomization:
-    Type: AWS::Cognito::UserPoolUICustomizationAttachment
-    Properties:
-      UserPoolId: !Ref CognitoUserPool
-      ClientId: !Ref CognitoUserPoolClient
-      CSS: |
-        .banner-customizable { 
-          background-color: #ffffff;
-        }
-        .label-customizable {
-          font-weight: 400;
-        }
-        .textDescription-customizable {
-          padding-top: 10px;
-          padding-bottom: 10px;
-          display: block;
-        }
-        .idpButton-customizable {
-          margin-bottom: 15px;
-        }
-        .submitButton-customizable {
-          background-color: #2d72da;
-          border-color: #2d72da;
-        }
-        .submitButton-customizable:hover {
-          background-color: #1b5cc5;
-          border-color: #1b5cc5;
-        }
 
 Outputs:
   UserPoolId:
@@ -216,3 +226,11 @@ Outputs:
   HostedUIURL:
     Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/login?client_id=${CognitoUserPoolClient}&response_type=code&redirect_uri=${CallbackURL}
     Description: Complete Hosted UI Login URL
+
+  GoogleRedirectURI:
+    Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse
+    Description: Redirect URI to add in Google Cloud Console Authorized redirect URIs
+  
+  JavaScriptOrigins:
+    Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com
+    Description: JavaScript origins to add in Google Cloud Console Authorized JavaScript origins

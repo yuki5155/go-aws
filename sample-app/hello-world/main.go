@@ -27,6 +27,11 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	return events.APIGatewayProxyResponse{
 		Body:       string("ssss"),
 		StatusCode: 200,
+		Headers: map[string]string{
+			"Access-Control-Allow-Credentials": "true",
+			"Access-Control-Allow-Origin":      "https://mydevportal.com", // メインドメイン
+			"Set-Cookie":                       "session=your-session-value; HttpOnly; Secure; SameSite=Lax; Domain=.mydevportal.com; Path=/",
+		},
 	}, nil
 }
 

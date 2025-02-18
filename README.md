@@ -159,3 +159,11 @@ sam deploy \
   CertificateArn=arn_made_with_acm_request-certificate " \
   --capabilities CAPABILITY_IAM
 ```
+
+## create acm
+```
+aws acm request-certificate \
+  --domain-name domain_name \
+  --validation-method DNS \
+  --region ap-northeast-1
+```
