@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'sample-app
+
+  Sample SAM Template for sample-app
+
+  '
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - stg
+    - prd
+    Description: Environment name
+  CustomDomainName:
+    Type: String
+    Description: Custom domain name
+  HostedZoneId:
+    Type: String
+    Description: Hosted zone ID
+  CertificateArn:
+    Type: String
+    Description: ARN of existing ACM certificate
+Globals:
+  Function:
+    Timeout: 5
+    MemorySize: 128
+    Tracing: Active
+  Api:
+    TracingEnabled: true
+    OpenApiVersion: '2.0'
+    EndpointConfiguration: REGIONAL
+Resources:
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName:
+        Ref: CustomDomainName
+      RegionalCertificateArn:
+        Ref: CertificateArn
+      EndpointConfiguration:
+        Types:
+        - REGIONAL
+      SecurityPolicy: TLS_1_2
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ApiDeployment
+      RestApiId:
+        Ref: ServerlessRestApi
+      StageName:
+        Ref: Environment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: HelloWorldFunction
+    Properties:
+      RestApiId:
+        Ref: ServerlessRestApi
+  ApiBasePath:
+    Type: AWS::ApiGateway::BasePathMapping
+    DependsOn:
+    - ApiStage
+    Properties:
+      DomainName:
+        Ref: CustomDomainName
+      RestApiId:
+        Ref: ServerlessRestApi
+      Stage:
+        Ref: Environment
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Ref: HostedZoneId
+      Name:
+        Ref: CustomDomainName
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+          - ApiCustomDomain
+          - RegionalDomainName
+        HostedZoneId:
+          Fn::GetAtt:
+          - ApiCustomDomain
+          - RegionalHostedZoneId
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+      SamResourceId: HelloWorldFunction
+    Properties:
+      CodeUri: HelloWorldFunction
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+      - x86_64
+      Events:
+        CatchAll:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: GET
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name:
+        Fn::Join:
+        - ''
+        - - ApplicationInsights-SAM-
+          - Ref: AWS::StackName
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName:
+        Fn::Join:
+        - ''
+        - - ApplicationInsights-SAM-
+          - Ref: AWS::StackName
+      AutoConfigurationEnabled: 'true'
+    DependsOn: ApplicationResourceGroup
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
+  CustomDomainUrl:
+    Description: Custom domain URL
+    Value:
+      Fn::Sub: https://${CustomDomainName}/
+  ApiGatewayRestApiId:
+    Description: API Gateway REST API ID
+    Value:
+      Ref: ServerlessRestApi
+  ApiGatewayRestApiStage:
+    Description: API Gateway REST API Stage
+    Value:
+      Ref: Environment
