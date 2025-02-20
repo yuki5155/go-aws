@@ -234,3 +234,7 @@ Outputs:
   JavaScriptOrigins:
     Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com
     Description: JavaScript origins to add in Google Cloud Console Authorized JavaScript origins
+
+  LogoutEndpoint:
+    Value: !Sub https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/logout?client_id=${CognitoUserPoolClient}&logout_uri=${LogoutURL}
+    Description: Complete Logout URL
