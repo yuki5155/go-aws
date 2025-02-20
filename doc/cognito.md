@@ -1,3 +1,8 @@
+## About
+
+there are same code that does not work if you use non-pro localstack.
+codes below are tested on aws cloud.
+
 ## Code Examples
 
 ### Configuration
