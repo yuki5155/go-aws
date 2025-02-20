@@ -2,6 +2,8 @@ package cognito
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -182,23 +184,28 @@ func GetUserAttributes(accessToken string, config CognitoConfig) (map[string]str
 }
 
 // RefreshTokens refreshes the access and ID tokens using a refresh token
-func RefreshTokens(refreshToken string, config CognitoConfig) (*TokenResponse, error) {
-	cfg, err := createAWSConfig(config.Region)
+func RefreshTokens(refreshToken string, cognitoConfig CognitoConfig) (*TokenResponse, error) {
+	// Create AWS config with just region, no custom endpoint resolver
+	awsCfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(cognitoConfig.Region),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	cognitoClient := cognitoidentityprovider.NewFromConfig(cfg)
+	cognitoClient := cognitoidentityprovider.NewFromConfig(awsCfg)
+
+	// Use string literal for auth flow to match AWS enum exactly
 	input := &cognitoidentityprovider.InitiateAuthInput{
 		AuthFlow: types.AuthFlowTypeRefreshTokenAuth,
-		ClientId: aws.String(config.ClientID),
+		ClientId: aws.String(cognitoConfig.ClientID),
 		AuthParameters: map[string]string{
 			"REFRESH_TOKEN": refreshToken,
 		},
 	}
 
-	if config.ClientSecret != "" {
-		input.AuthParameters["SECRET_HASH"] = computeSecretHash(config.ClientID, config.ClientSecret, refreshToken)
+	if cognitoConfig.ClientSecret != "" {
+		input.AuthParameters["SECRET_HASH"] = computeSecretHash(cognitoConfig.ClientID, cognitoConfig.ClientSecret, refreshToken)
 	}
 
 	result, err := cognitoClient.InitiateAuth(context.Background(), input)
@@ -226,12 +233,34 @@ func RefreshTokens(refreshToken string, config CognitoConfig) (*TokenResponse, e
 func createAWSConfig(region string) (aws.Config, error) {
 	return config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(region),
+		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				// Normalize service name to lowercase
+				serviceLower := strings.ToLower(service)
+
+				// Handle Cognito Identity Provider specifically
+				if serviceLower == "cognito-idp" ||
+					serviceLower == "cognitoidentityprovider" ||
+					strings.Contains(serviceLower, "cognito") {
+					return aws.Endpoint{
+						URL: fmt.Sprintf("https://cognito-idp.%s.amazonaws.com", region),
+					}, nil
+				}
+
+				// For any other AWS service
+				return aws.Endpoint{
+					URL: fmt.Sprintf("https://%s.%s.amazonaws.com", serviceLower, region),
+				}, nil
+			},
+		)),
 	)
 }
 
 // Helper function to compute secret hash for client secret validation
 // In a real implementation, you would use HMAC-SHA256
 func computeSecretHash(clientID, clientSecret, username string) string {
-	// Simplified - in a real implementation use crypto/hmac
-	return "computed-secret-hash"
+	// The format is: SHA256(client_secret + username + client_id)
+	mac := hmac.New(sha256.New, []byte(clientSecret))
+	mac.Write([]byte(username + clientID))
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
