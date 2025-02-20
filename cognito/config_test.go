@@ -38,6 +38,33 @@ func loadEnv(filename string) error {
 	return scanner.Err()
 }
 
+// Helper function to create AWS configuration
+func createAWSConfig(region string) (aws.Config, error) {
+	return config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(region),
+		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				// Normalize service name to lowercase
+				serviceLower := strings.ToLower(service)
+
+				// Handle Cognito Identity Provider specifically
+				if serviceLower == "cognito-idp" ||
+					serviceLower == "cognitoidentityprovider" ||
+					strings.Contains(serviceLower, "cognito") {
+					return aws.Endpoint{
+						URL: fmt.Sprintf("https://cognito-idp.%s.amazonaws.com", region),
+					}, nil
+				}
+
+				// For any other AWS service
+				return aws.Endpoint{
+					URL: fmt.Sprintf("https://%s.%s.amazonaws.com", serviceLower, region),
+				}, nil
+			},
+		)),
+	)
+}
+
 func TestGetTokensAndVerify(t *testing.T) {
 	// Load environment variables
 	if err := loadEnv("../.env"); err != nil {
@@ -101,7 +128,18 @@ func TestGetTokensAndVerify(t *testing.T) {
 		if sub, ok := claims["sub"].(string); ok {
 			fmt.Printf("Subject (sub): %s\n", sub)
 		}
-		// Other claims...
+		if email, ok := claims["email"].(string); ok {
+			fmt.Printf("Email: %s\n", email)
+		}
+		if name, ok := claims["name"].(string); ok {
+			fmt.Printf("Name: %s\n", name)
+		}
+		if exp, ok := claims["exp"].(float64); ok {
+			fmt.Printf("Expiration: %v\n", exp)
+		}
+		if iat, ok := claims["iat"].(float64); ok {
+			fmt.Printf("Issued At: %v\n", iat)
+		}
 	}
 
 	// Step 3: Get user attributes using direct client

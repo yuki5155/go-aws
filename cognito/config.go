@@ -159,13 +159,9 @@ func ValidateIDToken(idToken string, config CognitoConfig) (bool, JWTClaims, err
 }
 
 // GetUserAttributes retrieves user attributes using the access token
-func GetUserAttributes(accessToken string, config CognitoConfig) (map[string]string, error) {
-	cfg, err := createAWSConfig(config.Region)
-	if err != nil {
-		return nil, err
-	}
+func GetUserAttributes(accessToken string, config CognitoConfig, awsConf aws.Config) (map[string]string, error) {
 
-	cognitoClient := cognitoidentityprovider.NewFromConfig(cfg)
+	cognitoClient := cognitoidentityprovider.NewFromConfig(awsConf)
 	input := &cognitoidentityprovider.GetUserInput{
 		AccessToken: aws.String(accessToken),
 	}
@@ -227,33 +223,6 @@ func RefreshTokens(refreshToken string, cognitoConfig CognitoConfig) (*TokenResp
 	}
 
 	return response, nil
-}
-
-// Helper function to create AWS configuration
-func createAWSConfig(region string) (aws.Config, error) {
-	return config.LoadDefaultConfig(context.Background(),
-		config.WithRegion(region),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				// Normalize service name to lowercase
-				serviceLower := strings.ToLower(service)
-
-				// Handle Cognito Identity Provider specifically
-				if serviceLower == "cognito-idp" ||
-					serviceLower == "cognitoidentityprovider" ||
-					strings.Contains(serviceLower, "cognito") {
-					return aws.Endpoint{
-						URL: fmt.Sprintf("https://cognito-idp.%s.amazonaws.com", region),
-					}, nil
-				}
-
-				// For any other AWS service
-				return aws.Endpoint{
-					URL: fmt.Sprintf("https://%s.%s.amazonaws.com", serviceLower, region),
-				}, nil
-			},
-		)),
-	)
 }
 
 // Helper function to compute secret hash for client secret validation
