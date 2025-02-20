@@ -131,6 +131,9 @@ if err != nil {
 In this example, the primary key attribute is assumed to have the name "id". If the specified item doesn’t exist, the method returns an error (e.g., ErrNotFound).
 
 
+## Cognito
+[cognito](doc/cognito.md)
+
 
 ## setting the custom domain in SAM
 
