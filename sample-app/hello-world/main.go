@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -24,13 +25,31 @@ var (
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	log.Printf("Received login request: %+v", request)
 
+	cookieDomain := os.Getenv("COOKIE_DOMAIN")
+	if cookieDomain == "" {
+		cookieDomain = ".mydevportal.com" // デフォルト値
+	}
+
+	allowOrigin := os.Getenv("ALLOW_ORIGIN")
+	if allowOrigin == "" {
+		allowOrigin = "https://mydevportal.com" // デフォルト値
+	}
+
+	// Cookie文字列の構築
+	cookieStr := "session=your-session-value" +
+		"; HttpOnly" +
+		"; Secure" +
+		"; SameSite=Lax" +
+		"; Domain=" + cookieDomain +
+		"; Path=/"
+
 	return events.APIGatewayProxyResponse{
 		Body:       string("ssss"),
 		StatusCode: 200,
 		Headers: map[string]string{
 			"Access-Control-Allow-Credentials": "true",
-			"Access-Control-Allow-Origin":      "https://mydevportal.com", // メインドメイン
-			"Set-Cookie":                       "session=your-session-value; HttpOnly; Secure; SameSite=Lax; Domain=.mydevportal.com; Path=/",
+			"Access-Control-Allow-Origin":      allowOrigin, // メインドメイン
+			"Set-Cookie":                       cookieStr,
 		},
 	}, nil
 }

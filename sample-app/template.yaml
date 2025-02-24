@@ -26,6 +26,17 @@ Parameters:
     Type: String
     Description: ARN of existing ACM certificate
 
+  CookieDomain:
+    Type: String
+    Description: Cookie domain
+    Default: ''
+
+  ALLOW_ORIGIN:
+    Type: String
+    Description: CORS allow origin
+    Default: ''
+  
+
 Globals:
   Function:
     Timeout: 5
@@ -104,6 +115,8 @@ Resources:
         Variables:
           GOCACHE: /tmp/.cache/go-build
           GOPATH: /tmp/go
+          COOKIE_DOMAIN: !Ref CookieDomain
+          ALLOW_ORIGIN: !Ref ALLOW_ORIGIN
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
