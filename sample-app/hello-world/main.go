@@ -29,11 +29,13 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	if cookieDomain == "" {
 		cookieDomain = ".mydevportal.com" // デフォルト値
 	}
+	fmt.Println("cookieDomain", cookieDomain)
 
 	allowOrigin := os.Getenv("ALLOW_ORIGIN")
 	if allowOrigin == "" {
 		allowOrigin = "https://mydevportal.com" // デフォルト値
 	}
+	fmt.Println("allowOrigin", allowOrigin)
 
 	// Cookie文字列の構築
 	cookieStr := "session=your-session-value" +
