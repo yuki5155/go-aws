@@ -84,7 +84,7 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      StageName: !Sub "${Environment}-apigw" 
+      StageName: !Sub "${Environment}-apigw-1" 
 
   # Base path mapping (use the new ApiGateway resource)
   ApiBasePath:
