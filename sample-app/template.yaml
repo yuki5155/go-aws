@@ -69,11 +69,21 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
-  # API Stage (use the new ApiGateway resource)
+  # Create an explicit API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - HelloGet
+    Properties:
+      RestApiId: !Ref ApiGateway
+      Description: "Deployment for API Gateway"
+
+  # API Stage (now with DeploymentId)
   ApiStage:
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref ApiGateway
+      DeploymentId: !Ref ApiDeployment
       StageName: !Sub "${Environment}-apigw" 
 
   # Base path mapping (use the new ApiGateway resource)
@@ -144,6 +154,19 @@ Resources:
           GOPATH: /tmp/go
           COOKIE_DOMAIN: !Ref CookieDomain
           ALLOW_ORIGIN: !Ref AllowOrigin
+
+  # Create a logical ID for the API method that can be referenced in DependsOn
+  HelloGet:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
