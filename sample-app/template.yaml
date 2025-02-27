@@ -75,7 +75,7 @@ Resources:
     Properties:
       DeploymentId: !Ref ApiDeployment
       RestApiId: !Ref ApiGateway
-      StageName: !Ref Environment
+      StageName: !Sub "${Environment}-new" 
 
   # API Deployment (use the new ApiGateway resource)
   ApiDeployment:
