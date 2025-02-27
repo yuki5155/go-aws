@@ -83,6 +83,7 @@ Resources:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ServerlessRestApi
       Stage: !Ref Environment
+      BasePath: api
 
   # DNS A Record
   ApiDnsRecord:
@@ -147,7 +148,7 @@ Outputs:
 
   CustomDomainUrl:
     Description: Custom domain URL
-    Value: !Sub https://${CustomDomainName}/
+    Value: !Sub https://${CustomDomainName}/api/
 
   ApiGatewayRestApiId:
     Description: API Gateway REST API ID
