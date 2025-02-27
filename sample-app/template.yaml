@@ -73,16 +73,8 @@ Resources:
   ApiStage:
     Type: AWS::ApiGateway::Stage
     Properties:
-      DeploymentId: !Ref ApiDeployment
       RestApiId: !Ref ApiGateway
-      StageName: !Sub "${Environment}-new" 
-
-  # API Deployment (use the new ApiGateway resource)
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: HelloWorldFunction
-    Properties:
-      RestApiId: !Ref ApiGateway
+      StageName: !Sub "${Environment}-apigw" 
 
   # Base path mapping (use the new ApiGateway resource)
   ApiBasePath:
