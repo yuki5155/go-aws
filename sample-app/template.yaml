@@ -34,25 +34,30 @@ Parameters:
   AllowOrigin:
     Type: String
     Description: CORS allow origin
-    Default: '*'
-  
+    Default: 'https://mydevportal.com'
 
 Globals:
   Function:
     Timeout: 5
     MemorySize: 128
     Tracing: Active
-  Api:
-    TracingEnabled: true
-    OpenApiVersion: '2.0'
-    EndpointConfiguration: REGIONAL
-    Cors:
-      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-      AllowOrigin: !Ref AllowOrigin
-      AllowCredentials: true
 
 Resources:
+  # 明示的にAPIを定義
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+      OpenApiVersion: '2.0'
+      # CORSを静的に設定
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'https://mydevportal.com'"
+        AllowCredentials: true
+
   # Custom domain
   ApiCustomDomain:
     Type: AWS::ApiGateway::DomainName
@@ -64,29 +69,29 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
-  # API Stage
+  # API Stage (use the new ApiGateway resource)
   ApiStage:
     Type: AWS::ApiGateway::Stage
     Properties:
       DeploymentId: !Ref ApiDeployment
-      RestApiId: !Ref ServerlessRestApi
+      RestApiId: !Ref ApiGateway
       StageName: !Ref Environment
 
-  # API Deployment
+  # API Deployment (use the new ApiGateway resource)
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn: HelloWorldFunction
     Properties:
-      RestApiId: !Ref ServerlessRestApi
+      RestApiId: !Ref ApiGateway
 
-  # Base path mapping
+  # Base path mapping (use the new ApiGateway resource)
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
     DependsOn: 
       - ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
-      RestApiId: !Ref ServerlessRestApi
+      RestApiId: !Ref ApiGateway
       Stage: !Ref Environment
       BasePath: api
 
@@ -101,17 +106,28 @@ Resources:
         DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
         HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
 
-  # GatewayResponse for CORS
-  GatewayResponseDefault4XX:
+  # CORS用のGatewayResponse
+  GatewayResponse4XX:
     Type: 'AWS::ApiGateway::GatewayResponse'
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
       ResponseType: DEFAULT_4XX
-      RestApiId: !Ref ServerlessRestApi
+      RestApiId: !Ref ApiGateway
+
+  GatewayResponse5XX:
+    Type: 'AWS::ApiGateway::GatewayResponse'
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: DEFAULT_5XX
+      RestApiId: !Ref ApiGateway
 
   HelloWorldFunction:
     Type: AWS::Serverless::Function
@@ -124,12 +140,12 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        CatchAll:
-          Type: Api 
+        HelloGet:
+          Type: Api
           Properties:
             Path: /hello
             Method: GET
-            RestApiId: !Ref ServerlessRestApi
+            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -162,7 +178,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
 
   CustomDomainUrl:
     Description: Custom domain URL
@@ -170,7 +186,7 @@ Outputs:
 
   ApiGatewayRestApiId:
     Description: API Gateway REST API ID
-    Value: !Ref ServerlessRestApi
+    Value: !Ref ApiGateway
 
   ApiGatewayRestApiStage:
     Description: API Gateway REST API Stage
