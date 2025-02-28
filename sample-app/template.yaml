@@ -74,6 +74,8 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - HelloGet
+      - HelloPost
+      - HelloPostResource
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -154,6 +156,30 @@ Resources:
           GOPATH: /tmp/go
           COOKIE_DOMAIN: !Ref CookieDomain
           ALLOW_ORIGIN: !Ref AllowOrigin
+          
+  HelloWorldPostFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: hello-world-post/
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+        - x86_64
+      Events:
+        HelloPost:
+          Type: Api
+          Properties:
+            Path: /hello-post
+            Method: POST
+            RestApiId: !Ref ApiGateway
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+          COOKIE_DOMAIN: !Ref CookieDomain
+          ALLOW_ORIGIN: !Ref AllowOrigin
 
   # Create a logical ID for the API method that can be referenced in DependsOn
   HelloGet:
@@ -167,6 +193,27 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
+        
+  # Create HelloPostResource for /hello-post path
+  HelloPostResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: hello-post
+
+  # Add HelloPost method
+  HelloPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref HelloPostResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations"
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group

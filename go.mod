@@ -13,7 +13,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 )
 
-require github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.49.4 // indirect
+require github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.49.4
 
 require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.8 // indirect
