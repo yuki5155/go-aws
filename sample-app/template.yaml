@@ -167,13 +167,6 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
-      Events:
-        HelloPost:
-          Type: Api
-          Properties:
-            Path: /hello-post
-            Method: POST
-            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
