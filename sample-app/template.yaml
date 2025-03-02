@@ -74,8 +74,8 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - HelloGet
-      - HelloPost
-      - HelloPostResource
+      # HelloPostResourceは参照せず、Lambdaのイベント（HelloPost）のみ参照する
+      - HelloWorldPostFunction
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -194,26 +194,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
         
-  # Create HelloPostResource for /hello-post path
-  HelloPostResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ParentId: !GetAtt ApiGateway.RootResourceId
-      PathPart: hello-post
-
-  # Add HelloPost method
-  HelloPost:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ResourceId: !Ref HelloPostResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations"
+  # HelloPostResourceとHelloPostを削除し、代わりにServerlessイベントに任せる
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
