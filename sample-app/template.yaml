@@ -50,13 +50,17 @@ Resources:
       StageName: !Ref Environment
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
-      OpenApiVersion: '2.0'
+      OpenApiVersion: '3.0.1'
       # CORSを静的に設定
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
+      DefinitionBody: !Transform 
+        Name: AWS::Include
+        Parameters: 
+          Location: openapi.yaml
 
   # Custom domain
   ApiCustomDomain:
