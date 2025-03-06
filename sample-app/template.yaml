@@ -57,10 +57,12 @@ Resources:
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
-      DefinitionBody: !Transform 
-        Name: AWS::Include
-        Parameters: 
-          Location: openapi.yaml
+      # SAMのテンプレート変数機能を使用してOpenAPIを読み込む
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: openapi.yaml
 
   # Custom domain
   ApiCustomDomain:
@@ -78,7 +80,6 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - HelloGet
-      # HelloPostResourceは参照せず、Lambdaのイベント（HelloPost）のみ参照する
       - HelloWorldPostFunction
     Properties:
       RestApiId: !Ref ApiGateway
@@ -197,8 +198,6 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
-        
-  # HelloPostResourceとHelloPostを削除し、代わりにServerlessイベントに任せる
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
