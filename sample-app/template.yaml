@@ -36,6 +36,31 @@ Parameters:
     Description: CORS allow origin
     Default: 'https://mydevportal.com'
 
+  COGNITO_DOMAIN:
+    Type: String
+    Description: Cognito domain name
+    Default: ''
+
+  COGNITO_CLIENT_ID:
+    Type: String
+    Description: Cognito app client ID
+    Default: ''
+
+  COGNITO_CLIENT_SECRET:
+    Type: String
+    Description: Cognito app client secret
+    Default: ''
+
+  COGNITO_USER_POOL_ID:
+    Type: String
+    Description: Cognito user pool ID
+    Default: ''
+
+  COGNITO_CALLBACK_URL:
+    Type: String
+    Description: Cognito callback URL
+    Default: ''
+
 Globals:
   Function:
     Timeout: 5
@@ -80,6 +105,7 @@ Resources:
       - HelloGet
       # HelloPostResourceは参照せず、Lambdaのイベント（HelloPost）のみ参照する
       - HelloWorldPostFunction
+      - CallbackFunction
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -184,6 +210,35 @@ Resources:
           GOPATH: /tmp/go
           COOKIE_DOMAIN: !Ref CookieDomain
           ALLOW_ORIGIN: !Ref AllowOrigin
+
+  CallbackFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: callback/
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+        - x86_64
+      Events:
+        Callback:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: POST
+            RestApiId: !Ref ApiGateway
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+          COOKIE_DOMAIN: !Ref CookieDomain
+          ALLOW_ORIGIN: !Ref AllowOrigin
+          COGNITO_DOMAIN: !Ref COGNITO_DOMAIN
+          COGNITO_CLIENT_ID: !Ref COGNITO_CLIENT_ID
+          COGNITO_CLIENT_SECRET: !Ref COGNITO_CLIENT_SECRET
+          COGNITO_USER_POOL_ID: !Ref COGNITO_USER_POOL_ID
+          COGNITO_CALLBACK_URL: !Ref COGNITO_CALLBACK_URL
 
   # Create a logical ID for the API method that can be referenced in DependsOn
   HelloGet:

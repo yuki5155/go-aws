@@ -68,6 +68,50 @@ paths:
         passthroughBehavior: when_no_match
         httpMethod: POST
         type: aws_proxy
+  /callback:
+    post:
+      summary: Processes OAuth callback
+      description: Handles the authorization code callback from Cognito OAuth flow
+      operationId: processCallback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  description: The authorization code received from Cognito
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Authentication successful
+        '400':
+          description: Invalid request format or missing authorization code
+        '401':
+          description: Failed to authenticate
+        '405':
+          description: Method not allowed
+        '500':
+          description: Internal server error
+      x-amazon-apigateway-integration:
+        uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations"
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
 components:
   securitySchemes:
     CognitoAuth:
