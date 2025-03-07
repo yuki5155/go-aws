@@ -17,7 +17,8 @@ paths:
               schema:
                 type: string
       x-amazon-apigateway-integration:
-        uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
+        uri: 
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
         passthroughBehavior: when_no_match
         httpMethod: POST
         type: aws_proxy
@@ -64,7 +65,8 @@ paths:
         '500':
           description: Internal server error
       x-amazon-apigateway-integration:
-        uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations"
+        uri:
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations"
         passthroughBehavior: when_no_match
         httpMethod: POST
         type: aws_proxy
@@ -134,4 +136,4 @@ x-amazon-apigateway-binary-media-types:
   - 'application/json'
   - 'application/xml'
   - 'text/plain'
-  - 'text/html' 
+  - 'text/html'
