@@ -82,11 +82,56 @@ Resources:
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
-      # SAMのテンプレート変数機能を使用してOpenAPIを読み込む
-      DefinitionBody: !Transform 
-        Name: AWS::Include
-        Parameters: 
-          Location: openapi.yaml
+      # Swagger/OpenAPI定義を直接埋め込む
+      DefinitionBody:
+        openapi: "3.0.1"
+        info:
+          title: "API Gateway"
+          version: "1.0"
+        paths:
+          /hello:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+              responses:
+                "200":
+                  description: "200 response"
+          /hello-post:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+              responses:
+                "200":
+                  description: "200 response"
+          /callback:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+              responses:
+                "200":
+                  description: "200 response"
+        x-amazon-apigateway-binary-media-types:
+          - "*/*"
+        x-amazon-apigateway-cors:
+          allowOrigins:
+            - "'https://mydevportal.com'"
+          allowMethods:
+            - "'GET,POST,PUT,DELETE,OPTIONS'"
+          allowHeaders:
+            - "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+          allowCredentials: true
 
   # Custom domain
   ApiCustomDomain:
