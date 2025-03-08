@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -34,9 +35,25 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		}, nil
 	}
 
+	// Base64エンコードされたボディをデコードする処理
+	var requestBody []byte
+	var err error
+	if request.IsBase64Encoded {
+		requestBody, err = base64.StdEncoding.DecodeString(request.Body)
+		if err != nil {
+			log.Printf("Error decoding base64 request body: %v", err)
+			return events.APIGatewayProxyResponse{
+				StatusCode: 400,
+				Body:       "Invalid request format",
+			}, fmt.Errorf("invalid base64 encoded body: %w", err)
+		}
+	} else {
+		requestBody = []byte(request.Body)
+	}
+
 	// リクエストボディの解析
 	var callbackReq CallbackRequest
-	if err := json.Unmarshal([]byte(request.Body), &callbackReq); err != nil {
+	if err := json.Unmarshal(requestBody, &callbackReq); err != nil {
 		log.Printf("Error parsing request body: %v", err)
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -135,8 +152,9 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 			"Content-Type":                     "application/json",
 			"Access-Control-Allow-Credentials": "true",
 			"Access-Control-Allow-Origin":      allowOrigin,
-			"Set-Cookie":                       cookieStr,
-			"Set-Cookie2":                      idTokenCookieStr, // 複数のCookieを設定
+		},
+		MultiValueHeaders: map[string][]string{
+			"Set-Cookie": {cookieStr, idTokenCookieStr},
 		},
 	}, nil
 }
