@@ -36,27 +36,27 @@ Parameters:
     Description: CORS allow origin
     Default: 'https://mydevportal.com'
 
-  COGNITO_DOMAIN:
+  CognitoDomain:
     Type: String
     Description: Cognito domain name
     Default: ''
 
-  COGNITO_CLIENT_ID:
+  CognitoClientID:
     Type: String
     Description: Cognito app client ID
     Default: ''
 
-  COGNITO_CLIENT_SECRET:
+  CognitoClientSecret:
     Type: String
     Description: Cognito app client secret
     Default: ''
 
-  COGNITO_USER_POOL_ID:
+  CognitoUserPoolID:
     Type: String
     Description: Cognito user pool ID
     Default: ''
 
-  COGNITO_CALLBACK_URL:
+  CognitoCallbackURL:
     Type: String
     Description: Cognito callback URL
     Default: ''
