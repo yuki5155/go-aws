@@ -83,11 +83,10 @@ Resources:
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
       # SAMのテンプレート変数機能を使用してOpenAPIを読み込む
-      DefinitionBody:
-        Fn::Transform:
-          Name: AWS::Include
-          Parameters:
-            Location: openapi.yaml
+      DefinitionBody: !Transform 
+        Name: AWS::Include
+        Parameters: 
+          Location: openapi.yaml
 
   # Custom domain
   ApiCustomDomain:
