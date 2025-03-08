@@ -24,4 +24,16 @@ functions = ["HelloWorldPostFunction"]
 [function_build_definitions.336c9ecb-4630-4791-853a-6e7d3c315cc9.metadata]
 BuildMethod = "go1.x"
 
+[function_build_definitions.a29b0b3e-f446-471f-a031-385019f9dda1]
+codeuri = "/workspaces/go-aws/sample-app/callback"
+runtime = "provided.al2"
+architecture = "x86_64"
+handler = "bootstrap"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["CallbackFunction"]
+
+[function_build_definitions.a29b0b3e-f446-471f-a031-385019f9dda1.metadata]
+BuildMethod = "go1.x"
+
 [layer_build_definitions]

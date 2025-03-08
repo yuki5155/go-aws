@@ -31,6 +31,26 @@ Parameters:
     Type: String
     Description: CORS allow origin
     Default: https://mydevportal.com
+  COGNITO_DOMAIN:
+    Type: String
+    Description: Cognito domain name
+    Default: ''
+  COGNITO_CLIENT_ID:
+    Type: String
+    Description: Cognito app client ID
+    Default: ''
+  COGNITO_CLIENT_SECRET:
+    Type: String
+    Description: Cognito app client secret
+    Default: ''
+  COGNITO_USER_POOL_ID:
+    Type: String
+    Description: Cognito user pool ID
+    Default: ''
+  COGNITO_CALLBACK_URL:
+    Type: String
+    Description: Cognito callback URL
+    Default: ''
 Globals:
   Function:
     Timeout: 5
@@ -44,12 +64,17 @@ Resources:
         Ref: Environment
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
-      OpenApiVersion: '2.0'
+      OpenApiVersion: 3.0.1
       Cors:
         AllowMethods: '''GET,POST,PUT,DELETE,OPTIONS'''
         AllowHeaders: '''Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'''
         AllowOrigin: '''https://mydevportal.com'''
         AllowCredentials: true
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: ../../openapi.yaml
   ApiCustomDomain:
     Type: AWS::ApiGateway::DomainName
     Properties:
@@ -65,8 +90,8 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
     - HelloGet
-    - HelloPost
-    - HelloPostResource
+    - HelloWorldPostFunction
+    - CallbackFunction
     Properties:
       RestApiId:
         Ref: ApiGateway
@@ -185,6 +210,43 @@ Resources:
             Ref: CookieDomain
           ALLOW_ORIGIN:
             Ref: AllowOrigin
+  CallbackFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+      SamResourceId: CallbackFunction
+    Properties:
+      CodeUri: CallbackFunction
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+      - x86_64
+      Events:
+        Callback:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: POST
+            RestApiId:
+              Ref: ApiGateway
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+          COOKIE_DOMAIN:
+            Ref: CookieDomain
+          ALLOW_ORIGIN:
+            Ref: AllowOrigin
+          COGNITO_DOMAIN:
+            Ref: COGNITO_DOMAIN
+          COGNITO_CLIENT_ID:
+            Ref: COGNITO_CLIENT_ID
+          COGNITO_CLIENT_SECRET:
+            Ref: COGNITO_CLIENT_SECRET
+          COGNITO_USER_POOL_ID:
+            Ref: COGNITO_USER_POOL_ID
+          COGNITO_CALLBACK_URL:
+            Ref: COGNITO_CALLBACK_URL
   HelloGet:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -201,30 +263,6 @@ Resources:
         IntegrationHttpMethod: POST
         Uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations
-  HelloPostResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId:
-        Ref: ApiGateway
-      ParentId:
-        Fn::GetAtt:
-        - ApiGateway
-        - RootResourceId
-      PathPart: hello-post
-  HelloPost:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId:
-        Ref: ApiGateway
-      ResourceId:
-        Ref: HelloPostResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri:
-          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
