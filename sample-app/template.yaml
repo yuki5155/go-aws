@@ -235,11 +235,11 @@ Resources:
           GOPATH: /tmp/go
           COOKIE_DOMAIN: !Ref CookieDomain
           ALLOW_ORIGIN: !Ref AllowOrigin
-          COGNITO_DOMAIN: !Ref COGNITO_DOMAIN
-          COGNITO_CLIENT_ID: !Ref COGNITO_CLIENT_ID
-          COGNITO_CLIENT_SECRET: !Ref COGNITO_CLIENT_SECRET
-          COGNITO_USER_POOL_ID: !Ref COGNITO_USER_POOL_ID
-          COGNITO_CALLBACK_URL: !Ref COGNITO_CALLBACK_URL
+          COGNITO_DOMAIN: !Ref CognitoDomain
+          COGNITO_CLIENT_ID: !Ref CognitoClientID
+          COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolID
+          COGNITO_CALLBACK_URL: !Ref CognitoCallbackURL
 
   # Create a logical ID for the API method that can be referenced in DependsOn
   HelloGet:
