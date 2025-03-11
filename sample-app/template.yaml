@@ -113,17 +113,6 @@ Resources:
         AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
-      # リソースポリシーを追加
-      Auth:
-        ResourcePolicy:
-          CustomStatements: [
-            {
-              "Effect": "Allow",
-              "Principal": "*",
-              "Action": "execute-api:Invoke",
-              "Resource": "*"
-            }
-          ]
       # Swagger/OpenAPI定義を直接埋め込む
       DefinitionBody:
         openapi: "3.0.1"
@@ -230,7 +219,11 @@ Resources:
                     Access-Control-Allow-Credentials:
                       type: "string"
         x-amazon-apigateway-binary-media-types:
-          - "*/*"
+          - "application/json"
+          - "application/octet-stream"
+          - "application/x-www-form-urlencoded"
+          - "multipart/form-data"
+          - "text/html"
         x-amazon-apigateway-cors:
           allowOrigins:
             - "'https://mydevportal.com'"
