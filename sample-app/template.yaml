@@ -292,7 +292,7 @@ Resources:
       - ApiGateway
     Properties:
       RestApiId: !Ref ApiGateway
-      Description: !Sub "Deployment for API Gateway ${AWS::StackName} at ${AWS::TimestampUTC}"
+      Description: !Sub "Deployment for API Gateway ${AWS::StackName} with CORS support"
 
   # API Stage (now with DeploymentId)
   ApiStage:
