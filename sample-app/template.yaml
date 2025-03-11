@@ -101,7 +101,7 @@ Resources:
   ApiGatewayExecutionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "API-Gateway-Execution-Logs_${ApiGateway}/${Environment}-apigw-1"
+      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-execution-logs"
       RetentionInDays: 7
 
   # 明示的にAPIを定義
@@ -234,7 +234,7 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      StageName: !Ref Environment
+      StageName: !Sub "${Environment}-apigw-1"
       # ログ設定を追加
       MethodSettings:
         - ResourcePath: "/*"
@@ -245,7 +245,7 @@ Resources:
       AccessLogSetting:
         DestinationArn: !GetAtt ApiGatewayAccessLogGroup.Arn
         Format: '{ "requestId":"$context.requestId", "ip": "$context.identity.sourceIp", "requestTime":"$context.requestTime", "httpMethod":"$context.httpMethod", "routeKey":"$context.routeKey", "status":"$context.status", "protocol":"$context.protocol", "responseLength":"$context.responseLength", "errorMessage":"$context.error.message" }'
-      # CloudWatchロールをアタッチ
+      # トレース設定
       TracingEnabled: true
 
   # Base path mapping (use the new ApiGateway resource)
@@ -256,7 +256,7 @@ Resources:
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
-      Stage: !Ref Environment
+      Stage: !Sub "${Environment}-apigw-1"
       BasePath: api
 
   # DNS A Record
