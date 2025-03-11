@@ -80,7 +80,7 @@ Resources:
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: "'https://mydevportal.com'"
+        AllowOrigin: "'*'"
         AllowCredentials: true
       # Swagger/OpenAPI定義を直接埋め込む
       DefinitionBody:
@@ -126,7 +126,7 @@ Resources:
           - "*/*"
         x-amazon-apigateway-cors:
           allowOrigins:
-            - "'https://mydevportal.com'"
+            - "'*'"
           allowMethods:
             - "'GET,POST,PUT,DELETE,OPTIONS'"
           allowHeaders:
@@ -190,7 +190,7 @@ Resources:
     Type: 'AWS::ApiGateway::GatewayResponse'
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
@@ -201,7 +201,7 @@ Resources:
     Type: 'AWS::ApiGateway::GatewayResponse'
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
