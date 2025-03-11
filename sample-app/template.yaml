@@ -113,6 +113,17 @@ Resources:
         AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
+      # リソースポリシーを追加
+      Auth:
+        ResourcePolicy:
+          CustomStatements: [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "execute-api:Invoke",
+              "Resource": "*"
+            }
+          ]
       # Swagger/OpenAPI定義を直接埋め込む
       DefinitionBody:
         openapi: "3.0.1"
@@ -153,21 +164,16 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
+          /{proxy+}:
             options:
-              summary: CORS support
-              description: "CORS preflight request handler"
-              responses:
-                "200":
-                  description: "200 response"
-                  headers:
-                    Access-Control-Allow-Origin:
-                      type: "string"
-                    Access-Control-Allow-Methods:
-                      type: "string"
-                    Access-Control-Allow-Headers:
-                      type: "string"
-                    Access-Control-Allow-Credentials:
-                      type: "string"
+              summary: CORS support for any path
+              description: "Enable CORS by returning correct headers"
+              parameters:
+                - name: proxy
+                  in: path
+                  required: true
+                  schema:
+                    type: string
               x-amazon-apigateway-integration:
                 type: "mock"
                 requestTemplates:
@@ -182,6 +188,18 @@ Resources:
                       method.response.header.Access-Control-Allow-Credentials: "'true'"
                     responseTemplates:
                       application/json: "{}"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
         x-amazon-apigateway-binary-media-types:
           - "*/*"
         x-amazon-apigateway-cors:
@@ -263,7 +281,7 @@ Resources:
       ResponseParameters:
         gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
       ResponseType: DEFAULT_4XX
       RestApiId: !Ref ApiGateway
@@ -274,9 +292,31 @@ Resources:
       ResponseParameters:
         gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
       ResponseType: DEFAULT_5XX
+      RestApiId: !Ref ApiGateway
+
+  GatewayResponseMissingAuthentication:
+    Type: 'AWS::ApiGateway::GatewayResponse'
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: MISSING_AUTHENTICATION_TOKEN
+      RestApiId: !Ref ApiGateway
+
+  GatewayResponseUnauthorized:
+    Type: 'AWS::ApiGateway::GatewayResponse'
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: UNAUTHORIZED
       RestApiId: !Ref ApiGateway
 
   HelloWorldFunction:
