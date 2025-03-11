@@ -282,8 +282,10 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - HelloGet
-      - HelloWorldPostFunction
-      - CallbackFunction
+      - HelloWorldFunctionApiPermission
+      - HelloWorldPostFunctionApiPermission
+      - CallbackFunctionApiPermission
+      - CallbackFunctionOptionsApiPermission
       - ApiGateway
     Properties:
       RestApiId: !Ref ApiGateway
@@ -439,12 +441,32 @@ Resources:
             Path: /api/callback
             Method: POST
             RestApiId: !Ref ApiGateway
+            Auth:
+              ResourcePolicy:
+                CustomStatements: [
+                  {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "execute-api:Invoke",
+                    "Resource": !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}/POST/api/callback"
+                  }
+                ]
         CallbackOptions:
           Type: Api
           Properties:
             Path: /api/callback
             Method: OPTIONS
             RestApiId: !Ref ApiGateway
+            Auth:
+              ResourcePolicy:
+                CustomStatements: [
+                  {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "execute-api:Invoke",
+                    "Resource": !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}/OPTIONS/api/callback"
+                  }
+                ]
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -491,6 +513,39 @@ Resources:
           - Ref: AWS::StackName
       AutoConfigurationEnabled: 'true'
     DependsOn: ApplicationResourceGroup
+
+  # Lambda関数のパーミッションを明示的に定義
+  CallbackFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CallbackFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}/POST/api/callback"
+
+  CallbackFunctionOptionsApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CallbackFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}/OPTIONS/api/callback"
+  
+  HelloWorldFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref HelloWorldFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}/GET/hello"
+      
+  HelloWorldPostFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref HelloWorldPostFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}/POST/hello-post"
 
 Outputs:
   ApiUrl:
