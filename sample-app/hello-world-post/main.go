@@ -39,7 +39,34 @@ type LoginResponse struct {
 }
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	log.Printf("Received POST request: %+v", request)
+	log.Printf("Received request: %s %s", request.HTTPMethod, request.Path)
+
+	// 環境変数の取得
+	cookieDomain := os.Getenv("COOKIE_DOMAIN")
+	if cookieDomain == "" {
+		cookieDomain = ".mydevportal.com" // デフォルト値
+	}
+	fmt.Println("cookieDomain", cookieDomain)
+
+	allowOrigin := os.Getenv("ALLOW_ORIGIN")
+	if allowOrigin == "" {
+		allowOrigin = "https://mydevportal.com" // デフォルト値
+	}
+	fmt.Println("allowOrigin", allowOrigin)
+
+	// OPTIONSリクエスト (CORS preflight) の処理
+	if request.HTTPMethod == "OPTIONS" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 200,
+			Headers: map[string]string{
+				"Access-Control-Allow-Origin":      allowOrigin,
+				"Access-Control-Allow-Methods":     "POST, OPTIONS",
+				"Access-Control-Allow-Headers":     "Content-Type, Authorization",
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Max-Age":           "86400",
+			},
+		}, nil
+	}
 
 	// POSTメソッド以外は拒否
 	if request.HTTPMethod != "POST" {
@@ -69,19 +96,6 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
 	// 認証成功を想定（実際にはDB検証などが必要）
 	log.Printf("User %s successfully authenticated", loginReq.Username)
-
-	// 環境変数の取得
-	cookieDomain := os.Getenv("COOKIE_DOMAIN")
-	if cookieDomain == "" {
-		cookieDomain = ".mydevportal.com" // デフォルト値
-	}
-	fmt.Println("cookieDomain", cookieDomain)
-
-	allowOrigin := os.Getenv("ALLOW_ORIGIN")
-	if allowOrigin == "" {
-		allowOrigin = "https://mydevportal.com" // デフォルト値
-	}
-	fmt.Println("allowOrigin", allowOrigin)
 
 	// セッションID生成（実際には安全な方法で生成する必要あり）
 	sessionID := "session-" + loginReq.Username + "-" + fmt.Sprint(os.Getpid())
