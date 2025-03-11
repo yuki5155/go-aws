@@ -101,7 +101,7 @@ Resources:
   ApiGatewayExecutionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "API-Gateway-Execution-Logs_${ApiGateway}/${Environment}"
+      LogGroupName: !Sub "API-Gateway-Execution-Logs_${ApiGateway}/${Environment}-apigw-1"
       RetentionInDays: 7
 
   # 明示的にAPIを定義
