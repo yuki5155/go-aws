@@ -191,6 +191,11 @@ Resources:
   # API Stage (now with DeploymentId)
   ApiStage:
     Type: AWS::ApiGateway::Stage
+    DependsOn:
+      - ApiGatewayAccount
+      - ApiGatewayCloudWatchRole
+      - ApiGatewayAccessLogGroup
+      - ApiGatewayExecutionLogGroup
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
@@ -239,6 +244,8 @@ Resources:
   # アカウントレベルでAPI GatewayのCloudWatchロールを設定
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
+    DependsOn:
+      - ApiGatewayCloudWatchRole
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
