@@ -164,6 +164,35 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
+            options:
+              summary: CORS support for callback
+              description: "CORS preflight handler for callback endpoint"
+              x-amazon-apigateway-integration:
+                type: "mock"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                      method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                    responseTemplates:
+                      application/json: "{}"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
           /{proxy+}:
             options:
               summary: CORS support for any path
@@ -210,6 +239,37 @@ Resources:
           allowHeaders:
             - "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
           allowCredentials: true
+        x-amazon-apigateway-gateway-responses:
+          DEFAULT_4XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+          DEFAULT_5XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+          MISSING_AUTHENTICATION_TOKEN:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+          UNAUTHORIZED:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+          RESOURCE_NOT_FOUND:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
 
   # Custom domain
   ApiCustomDomain:
@@ -232,7 +292,7 @@ Resources:
       - ApiGateway
     Properties:
       RestApiId: !Ref ApiGateway
-      Description: "Deployment for API Gateway"
+      Description: !Sub "Deployment for API Gateway ${AWS::StackName} at ${AWS::TimestampUTC}"
 
   # API Stage (now with DeploymentId)
   ApiStage:
@@ -383,6 +443,12 @@ Resources:
           Properties:
             Path: /callback
             Method: POST
+            RestApiId: !Ref ApiGateway
+        CallbackOptions:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: OPTIONS
             RestApiId: !Ref ApiGateway
       Environment:
         Variables:
