@@ -68,40 +68,9 @@ Globals:
     Tracing: Active
 
 Resources:
-  # API GatewayがCloudWatchにログを書き込むためのIAMロール
-  ApiGatewayCloudWatchRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
-
-  # アカウントレベルでAPI GatewayのCloudWatchロールを設定
-  ApiGatewayAccount:
-    Type: AWS::ApiGateway::Account
-    DependsOn:
-      - ApiGatewayCloudWatchRole
-    Properties:
-      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
-
-  # CloudWatch Logsグループ
-  ApiGatewayAccessLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-access-logs"
-      RetentionInDays: 7
-
   # 明示的にAPIを定義
   ApiGateway:
     Type: AWS::Serverless::Api
-    DependsOn:
-      - ApiGatewayAccount
     Properties:
       StageName: !Ref Environment
       EndpointConfiguration: REGIONAL
@@ -109,8 +78,8 @@ Resources:
       OpenApiVersion: '3.0.1'
       # CORSを静的に設定
       Cors:
-        AllowMethods: "'GET,POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
       # Swagger/OpenAPI定義を直接埋め込む
@@ -142,7 +111,7 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-          /api/callback:
+          /callback:
             post:
               x-amazon-apigateway-integration:
                 httpMethod: "POST"
@@ -153,79 +122,8 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-            options:
-              summary: CORS support for callback
-              description: "CORS preflight handler for callback endpoint"
-              x-amazon-apigateway-integration:
-                type: "mock"
-                passthroughBehavior: "when_no_match"
-                requestTemplates:
-                  application/json: "{\"statusCode\": 200}"
-                responses:
-                  default:
-                    statusCode: "200"
-                    responseParameters:
-                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
-                      method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-                      method.response.header.Access-Control-Allow-Credentials: "'true'"
-                    responseTemplates:
-                      application/json: "{}"
-              responses:
-                "200":
-                  description: "200 response"
-                  headers:
-                    Access-Control-Allow-Origin:
-                      type: "string"
-                    Access-Control-Allow-Methods:
-                      type: "string"
-                    Access-Control-Allow-Headers:
-                      type: "string"
-                    Access-Control-Allow-Credentials:
-                      type: "string"
-          /{proxy+}:
-            options:
-              summary: CORS support for any path
-              description: "Enable CORS by returning correct headers"
-              parameters:
-                - name: proxy
-                  in: path
-                  required: true
-                  schema:
-                    type: string
-              x-amazon-apigateway-integration:
-                type: "mock"
-                passthroughBehavior: "when_no_match"
-                requestTemplates:
-                  application/json: "{\"statusCode\": 200}"
-                responses:
-                  default:
-                    statusCode: "200"
-                    responseParameters:
-                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-                      method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-                      method.response.header.Access-Control-Allow-Credentials: "'true'"
-                    responseTemplates:
-                      application/json: "{}"
-              responses:
-                "200":
-                  description: "200 response"
-                  headers:
-                    Access-Control-Allow-Origin:
-                      type: "string"
-                    Access-Control-Allow-Methods:
-                      type: "string"
-                    Access-Control-Allow-Headers:
-                      type: "string"
-                    Access-Control-Allow-Credentials:
-                      type: "string"
         x-amazon-apigateway-binary-media-types:
-          - "application/json"
-          - "application/octet-stream"
-          - "application/x-www-form-urlencoded"
-          - "multipart/form-data"
-          - "text/html"
+          - "*/*"
         x-amazon-apigateway-cors:
           allowOrigins:
             - "'https://mydevportal.com'"
@@ -234,37 +132,6 @@ Resources:
           allowHeaders:
             - "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
           allowCredentials: true
-        x-amazon-apigateway-gateway-responses:
-          DEFAULT_4XX:
-            responseParameters:
-              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
-              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-          DEFAULT_5XX:
-            responseParameters:
-              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
-              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-          MISSING_AUTHENTICATION_TOKEN:
-            responseParameters:
-              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
-              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-          UNAUTHORIZED:
-            responseParameters:
-              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
-              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-          RESOURCE_NOT_FOUND:
-            responseParameters:
-              gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
-              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-              gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
 
   # Custom domain
   ApiCustomDomain:
@@ -282,32 +149,19 @@ Resources:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - HelloGet
-      - HelloWorldFunctionApiPermission
-      - HelloWorldPostFunctionApiPermission
-      - CallbackFunctionApiPermission
-      - CallbackFunctionOptionsApiPermission
-      - ApiGateway
+      - HelloWorldPostFunction
+      - CallbackFunction
     Properties:
       RestApiId: !Ref ApiGateway
-      Description: !Sub "Deployment for API Gateway ${AWS::StackName} with CORS support"
+      Description: "Deployment for API Gateway"
 
   # API Stage (now with DeploymentId)
   ApiStage:
     Type: AWS::ApiGateway::Stage
-    DependsOn:
-      - ApiGatewayAccount
-      - ApiGatewayCloudWatchRole
-      - ApiGatewayAccessLogGroup
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      StageName: !Sub "${Environment}-apigw-1"
-      # ログ設定を追加（アクセスログのみ）
-      AccessLogSetting:
-        DestinationArn: !GetAtt ApiGatewayAccessLogGroup.Arn
-        Format: '{ "requestId":"$context.requestId", "ip": "$context.identity.sourceIp", "requestTime":"$context.requestTime", "httpMethod":"$context.httpMethod", "routeKey":"$context.routeKey", "status":"$context.status", "protocol":"$context.protocol", "responseLength":"$context.responseLength", "errorMessage":"$context.error.message" }'
-      # トレース設定
-      TracingEnabled: true
+      StageName: !Sub "${Environment}-apigw-1" 
 
   # Base path mapping (use the new ApiGateway resource)
   ApiBasePath:
@@ -317,7 +171,7 @@ Resources:
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
-      Stage: !Sub "${Environment}-apigw-1"
+      Stage: !Ref Environment
       BasePath: api
 
   # DNS A Record
@@ -338,7 +192,7 @@ Resources:
       ResponseParameters:
         gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
       ResponseType: DEFAULT_4XX
       RestApiId: !Ref ApiGateway
@@ -349,31 +203,9 @@ Resources:
       ResponseParameters:
         gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
       ResponseType: DEFAULT_5XX
-      RestApiId: !Ref ApiGateway
-
-  GatewayResponseMissingAuthentication:
-    Type: 'AWS::ApiGateway::GatewayResponse'
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: MISSING_AUTHENTICATION_TOKEN
-      RestApiId: !Ref ApiGateway
-
-  GatewayResponseUnauthorized:
-    Type: 'AWS::ApiGateway::GatewayResponse'
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: UNAUTHORIZED
       RestApiId: !Ref ApiGateway
 
   HelloWorldFunction:
@@ -438,35 +270,9 @@ Resources:
         Callback:
           Type: Api
           Properties:
-            Path: /api/callback
+            Path: /callback
             Method: POST
             RestApiId: !Ref ApiGateway
-            Auth:
-              ResourcePolicy:
-                CustomStatements: [
-                  {
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": "execute-api:Invoke",
-                    "Resource": !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}-apigw-1/POST/api/callback"
-                  }
-                ]
-        CallbackOptions:
-          Type: Api
-          Properties:
-            Path: /api/callback
-            Method: OPTIONS
-            RestApiId: !Ref ApiGateway
-            Auth:
-              ResourcePolicy:
-                CustomStatements: [
-                  {
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": "execute-api:Invoke",
-                    "Resource": !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}-apigw-1/OPTIONS/api/callback"
-                  }
-                ]
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -514,39 +320,6 @@ Resources:
       AutoConfigurationEnabled: 'true'
     DependsOn: ApplicationResourceGroup
 
-  # Lambda関数のパーミッションを明示的に定義
-  CallbackFunctionApiPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CallbackFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}-apigw-1/POST/api/callback"
-
-  CallbackFunctionOptionsApiPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CallbackFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}-apigw-1/OPTIONS/api/callback"
-  
-  HelloWorldFunctionApiPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref HelloWorldFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}-apigw-1/GET/hello"
-      
-  HelloWorldPostFunctionApiPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref HelloWorldPostFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/${Environment}-apigw-1/POST/hello-post"
-
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
@@ -554,7 +327,7 @@ Outputs:
 
   CustomDomainUrl:
     Description: Custom domain URL
-    Value: !Sub https://${CustomDomainName}/api/callback
+    Value: !Sub https://${CustomDomainName}/api/
 
   ApiGatewayRestApiId:
     Description: API Gateway REST API ID
