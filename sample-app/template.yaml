@@ -130,17 +130,13 @@ Resources:
                   description: "200 response"
                   headers:
                     Access-Control-Allow-Origin:
-                      schema:
-                        type: "string"
+                      type: "string"
                     Access-Control-Allow-Methods:
-                      schema:
-                        type: "string"
+                      type: "string"
                     Access-Control-Allow-Headers:
-                      schema:
-                        type: "string"
+                      type: "string"
                     Access-Control-Allow-Credentials:
-                      schema:
-                        type: "string"
+                      type: "string"
               x-amazon-apigateway-integration:
                 type: "mock"
                 requestTemplates:
@@ -151,7 +147,7 @@ Resources:
                     responseParameters:
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-                      method.response.header.Access-Control-Allow-Origin: !Ref AllowOrigin
+                      method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
                       method.response.header.Access-Control-Allow-Credentials: "'true'"
                     responseTemplates:
                       application/json: "{}"
