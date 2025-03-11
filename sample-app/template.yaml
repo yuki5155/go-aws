@@ -273,6 +273,12 @@ Resources:
             Path: /callback
             Method: POST
             RestApiId: !Ref ApiGateway
+        CallbackOptions:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: OPTIONS
+            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
