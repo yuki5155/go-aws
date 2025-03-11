@@ -95,6 +95,8 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		"; Path=/" +
 		"; Max-Age=86400" // 24時間有効
 
+	fmt.Println("cookieStr", cookieStr)
+
 	// レスポンス作成
 	response := LoginResponse{
 		Status:  "success",
