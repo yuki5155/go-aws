@@ -97,13 +97,6 @@ Resources:
       LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-access-logs"
       RetentionInDays: 7
 
-  # CloudWatch ExecutionLogsグループ
-  ApiGatewayExecutionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-execution-logs"
-      RetentionInDays: 7
-
   # 明示的にAPIを定義
   ApiGateway:
     Type: AWS::Serverless::Api
@@ -230,18 +223,11 @@ Resources:
       - ApiGatewayAccount
       - ApiGatewayCloudWatchRole
       - ApiGatewayAccessLogGroup
-      - ApiGatewayExecutionLogGroup
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
       StageName: !Sub "${Environment}-apigw-1"
-      # ログ設定を追加
-      MethodSettings:
-        - ResourcePath: "/*"
-          HttpMethod: "*"
-          MetricsEnabled: true
-          DataTraceEnabled: true
-          LoggingLevel: INFO
+      # ログ設定を追加（アクセスログのみ）
       AccessLogSetting:
         DestinationArn: !GetAtt ApiGatewayAccessLogGroup.Arn
         Format: '{ "requestId":"$context.requestId", "ip": "$context.identity.sourceIp", "requestTime":"$context.requestTime", "httpMethod":"$context.httpMethod", "routeKey":"$context.routeKey", "status":"$context.status", "protocol":"$context.protocol", "responseLength":"$context.responseLength", "errorMessage":"$context.error.message" }'
