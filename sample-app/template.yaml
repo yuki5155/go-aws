@@ -142,7 +142,7 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-          /callback:
+          /api/callback:
             post:
               x-amazon-apigateway-integration:
                 httpMethod: "POST"
@@ -158,14 +158,15 @@ Resources:
               description: "CORS preflight handler for callback endpoint"
               x-amazon-apigateway-integration:
                 type: "mock"
+                passthroughBehavior: "when_no_match"
                 requestTemplates:
                   application/json: "{\"statusCode\": 200}"
                 responses:
                   default:
                     statusCode: "200"
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
                       method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
                       method.response.header.Access-Control-Allow-Credentials: "'true'"
                     responseTemplates:
@@ -194,14 +195,15 @@ Resources:
                     type: string
               x-amazon-apigateway-integration:
                 type: "mock"
+                passthroughBehavior: "when_no_match"
                 requestTemplates:
                   application/json: "{\"statusCode\": 200}"
                 responses:
                   default:
                     statusCode: "200"
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
                       method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
                       method.response.header.Access-Control-Allow-Credentials: "'true'"
                     responseTemplates:
@@ -434,13 +436,13 @@ Resources:
         Callback:
           Type: Api
           Properties:
-            Path: /callback
+            Path: /api/callback
             Method: POST
             RestApiId: !Ref ApiGateway
         CallbackOptions:
           Type: Api
           Properties:
-            Path: /callback
+            Path: /api/callback
             Method: OPTIONS
             RestApiId: !Ref ApiGateway
       Environment:
@@ -497,7 +499,7 @@ Outputs:
 
   CustomDomainUrl:
     Description: Custom domain URL
-    Value: !Sub https://${CustomDomainName}/api/
+    Value: !Sub https://${CustomDomainName}/api/callback
 
   ApiGatewayRestApiId:
     Description: API Gateway REST API ID
