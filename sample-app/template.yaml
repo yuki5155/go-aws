@@ -68,9 +68,47 @@ Globals:
     Tracing: Active
 
 Resources:
+  # API GatewayがCloudWatchにログを書き込むためのIAMロール
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
+  # アカウントレベルでAPI GatewayのCloudWatchロールを設定
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    DependsOn:
+      - ApiGatewayCloudWatchRole
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
+
+  # CloudWatch Logsグループ
+  ApiGatewayAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-access-logs"
+      RetentionInDays: 7
+
+  # CloudWatch ExecutionLogsグループ
+  ApiGatewayExecutionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "API-Gateway-Execution-Logs_${ApiGateway}/${Environment}"
+      RetentionInDays: 7
+
   # 明示的にAPIを定義
   ApiGateway:
     Type: AWS::Serverless::Api
+    DependsOn:
+      - ApiGatewayAccount
     Properties:
       StageName: !Ref Environment
       EndpointConfiguration: REGIONAL
@@ -78,8 +116,8 @@ Resources:
       OpenApiVersion: '3.0.1'
       # CORSを静的に設定
       Cors:
-        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'https://mydevportal.com'"
         AllowCredentials: true
       # Swagger/OpenAPI定義を直接埋め込む
@@ -125,6 +163,18 @@ Resources:
             options:
               summary: CORS support
               description: "CORS preflight request handler"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
               x-amazon-apigateway-integration:
                 type: "mock"
                 requestTemplates:
@@ -139,22 +189,6 @@ Resources:
                       method.response.header.Access-Control-Allow-Credentials: "'true'"
                     responseTemplates:
                       application/json: "{}"
-              responses:
-                "200":
-                  description: "200 response"
-                  headers:
-                    Access-Control-Allow-Origin:
-                      schema:
-                        type: "string"
-                    Access-Control-Allow-Methods:
-                      schema:
-                        type: "string"
-                    Access-Control-Allow-Headers:
-                      schema:
-                        type: "string"
-                    Access-Control-Allow-Credentials:
-                      schema:
-                        type: "string"
         x-amazon-apigateway-binary-media-types:
           - "*/*"
         x-amazon-apigateway-cors:
@@ -184,6 +218,7 @@ Resources:
       - HelloGet
       - HelloWorldPostFunction
       - CallbackFunction
+      - ApiGateway
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -199,7 +234,7 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      StageName: !Sub "${Environment}-apigw-1"
+      StageName: !Ref Environment
       # ログ設定を追加
       MethodSettings:
         - ResourcePath: "/*"
@@ -212,42 +247,6 @@ Resources:
         Format: '{ "requestId":"$context.requestId", "ip": "$context.identity.sourceIp", "requestTime":"$context.requestTime", "httpMethod":"$context.httpMethod", "routeKey":"$context.routeKey", "status":"$context.status", "protocol":"$context.protocol", "responseLength":"$context.responseLength", "errorMessage":"$context.error.message" }'
       # CloudWatchロールをアタッチ
       TracingEnabled: true
-
-  # CloudWatch Logsグループ
-  ApiGatewayAccessLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/apigateway/${AWS::StackName}-access-logs"
-      RetentionInDays: 7
-
-  # CloudWatch ExecutionLogsグループ
-  ApiGatewayExecutionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "API-Gateway-Execution-Logs_${ApiGateway}/${Environment}-apigw-1"
-      RetentionInDays: 7
-
-  # API GatewayがCloudWatchにログを書き込むためのIAMロール
-  ApiGatewayCloudWatchRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: apigateway.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
-
-  # アカウントレベルでAPI GatewayのCloudWatchロールを設定
-  ApiGatewayAccount:
-    Type: AWS::ApiGateway::Account
-    DependsOn:
-      - ApiGatewayCloudWatchRole
-    Properties:
-      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
   # Base path mapping (use the new ApiGateway resource)
   ApiBasePath:
