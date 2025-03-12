@@ -72,7 +72,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Sub "${Environment}-v2"
+      StageName: dummy-stage  # ダミーのステージ名（使用しない）
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
@@ -118,9 +118,36 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
+  # 明示的なデプロイメント
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - HelloWorldFunction
+      - HelloWorldPostFunction
+      - CallbackFunction
+      - Gateway4XXResponse
+      - Gateway5XXResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      Description: "API Gateway Deployment"
+
+  # 明示的なステージ
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref ApiGateway
+      StageName: !Sub "${Environment}-v2"
+      MethodSettings:
+        - LoggingLevel: INFO
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          DataTraceEnabled: true
+
   # Base path mapping
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
