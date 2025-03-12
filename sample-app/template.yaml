@@ -1,18 +1,4 @@
-# 明示的なPOSTメソッドの追加
-  CallbackPostMethod:
-    Type: AWS::ApiGateway::Method
-    DependsOn: CallbackResource
-    Properties:
-      HttpMethod: POST
-      ResourceId: !Ref CallbackResource
-      RestApiId: !Ref ApiGateway
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations
-      MethodResponses:
-        - StatusCode: 200AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   sample-app
@@ -82,7 +68,7 @@ Globals:
     Tracing: Active
 
 Resources:
-  # API Gateway定義（Swaggerを除去）
+  # API Gateway定義
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
@@ -97,14 +83,29 @@ Resources:
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: !Sub "'${AllowOrigin}'"
         AllowCredentials: true
-      EndpointConfiguration: REGIONAL
-      TracingEnabled: true
-      # シンプルなCORS設定
-      Cors:
-        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: !Sub "'${AllowOrigin}'"
-        AllowCredentials: true
+
+  # 明示的なGatewayResponseの定義
+  Gateway4XXResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: DEFAULT_4XX
+      RestApiId: !Ref ApiGateway
+
+  Gateway5XXResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: DEFAULT_5XX
+      RestApiId: !Ref ApiGateway
 
   # Custom domain
   ApiCustomDomain:
@@ -167,28 +168,61 @@ Resources:
         DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
         HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
 
-  # 明示的なGatewayResponseの定義
-  Gateway4XXResponse:
-    Type: AWS::ApiGateway::GatewayResponse
+  # 明示的に/callbackリソースを定義
+  CallbackResource:
+    Type: AWS::ApiGateway::Resource
     Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: DEFAULT_4XX
       RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: "callback"
+      
+  # OPTIONS メソッドを明示的に定義
+  CallbackOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    DependsOn: CallbackResource
+    Properties:
+      HttpMethod: OPTIONS
+      ResourceId: !Ref CallbackResource
+      RestApiId: !Ref ApiGateway
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        IntegrationHttpMethod: OPTIONS
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+            ResponseTemplates:
+              application/json: '{}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Credentials: true
 
-  Gateway5XXResponse:
-    Type: AWS::ApiGateway::GatewayResponse
+  # 明示的なPOSTメソッドの追加
+  CallbackPostMethod:
+    Type: AWS::ApiGateway::Method
+    DependsOn: CallbackResource
     Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: DEFAULT_5XX
+      HttpMethod: POST
+      ResourceId: !Ref CallbackResource
       RestApiId: !Ref ApiGateway
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations
+      MethodResponses:
+        - StatusCode: 200
 
   HelloWorldFunction:
     Type: AWS::Serverless::Function
@@ -261,6 +295,28 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolID
           COGNITO_CALLBACK_URL: !Ref CognitoCallbackURL
 
+  # Create a logical ID for the API method that can be referenced in DependsOn
+  HelloGet:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
+
+  # Lambda実行権限
+  CallbackFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CallbackFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/callback
+
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
@@ -298,4 +354,4 @@ Outputs:
 
   ApiGatewayRestApiStage:
     Description: API Gateway REST API Stage
-    Value: !Ref Environment
+    Value: !Sub "${Environment}-custom"
