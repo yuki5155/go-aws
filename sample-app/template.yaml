@@ -72,7 +72,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Ref Environment
+      StageName: dev-internal # 内部用ステージ名（実際には使用しない）
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       # シンプルなCORS設定
@@ -93,13 +93,13 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
-  # API Stage
-  ApiStage:
+  # API Stage - ユニークな名前に変更
+  ApiCustomStage:
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      StageName: !Ref Environment
+      StageName: !Sub "${Environment}-custom"
       MethodSettings:
         - LoggingLevel: INFO
           ResourcePath: '/*'
@@ -113,8 +113,6 @@ Resources:
       - HelloWorldFunction
       - HelloWorldPostFunction
       - CallbackFunction
-      - GatewayResponse4XX
-      - GatewayResponse5XX
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -123,11 +121,11 @@ Resources:
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
     DependsOn: 
-      - ApiStage
+      - ApiCustomStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
-      Stage: !Ref Environment
+      Stage: !Sub "${Environment}-custom"
       BasePath: api
 
   # DNS A Record
