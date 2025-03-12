@@ -83,20 +83,6 @@ Resources:
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: !Sub "'${AllowOrigin}'"
         AllowCredentials: true
-      # すべてのエンドポイントでOPTIONSを許可
-      GatewayResponses:
-        DEFAULT_4XX:
-          ResponseParameters:
-            gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-            gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-            gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-        DEFAULT_5XX:
-          ResponseParameters:
-            gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-            gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-            gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       # シンプルなCORS設定
@@ -137,6 +123,9 @@ Resources:
       - HelloWorldFunction
       - HelloWorldPostFunction
       - CallbackFunction
+      - CallbackOptionsMethod
+      - Gateway4XXResponse
+      - Gateway5XXResponse
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -164,7 +153,28 @@ Resources:
         DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
         HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
 
-  # CORS用のGatewayResponse（GatewayResponsesで統合したため削除）
+  # 明示的なGatewayResponseの定義
+  Gateway4XXResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: DEFAULT_4XX
+      RestApiId: !Ref ApiGateway
+
+  Gateway5XXResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      ResponseType: DEFAULT_5XX
+      RestApiId: !Ref ApiGateway
 
   HelloWorldFunction:
     Type: AWS::Serverless::Function
@@ -231,6 +241,8 @@ Resources:
             Path: /callback
             Method: POST
             RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: NONE
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
