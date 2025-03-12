@@ -72,7 +72,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Sub "${Environment}-custom-v2" # ユニークなステージ名を使用
+      StageName: dev-internal # 内部的なステージ名（実際のルーティングには使用しない）
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
@@ -132,6 +132,20 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
+      
+  # 明示的なステージ作成
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    DependsOn: ApiDeployment
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref ApiGateway
+      StageName: !Sub "${Environment}-custom-v2"
+      MethodSettings:
+        - LoggingLevel: INFO
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          DataTraceEnabled: true
 
   # Base path mapping
   ApiBasePath:
@@ -139,6 +153,7 @@ Resources:
     DependsOn: 
       - ApiGateway
       - ApiCustomDomain
+      - ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
