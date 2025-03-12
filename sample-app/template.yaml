@@ -72,7 +72,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: dev-internal # 内部的なステージ名（実際のルーティングには使用しない）
+      StageName: !Sub "${Environment}-v2"
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
@@ -84,7 +84,7 @@ Resources:
         AllowOrigin: !Sub "'${AllowOrigin}'"
         AllowCredentials: true
 
-  # 明示的なGatewayResponseの定義
+  # Gateway Responses for CORS
   Gateway4XXResponse:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
@@ -118,46 +118,13 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
-  # デプロイメントを作成
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - HelloWorldFunction
-      - HelloWorldPostFunction
-      - CallbackFunction
-      - CallbackOptionsMethod
-      - CallbackPostMethod
-      - Gateway4XXResponse
-      - Gateway5XXResponse
-    Properties:
-      RestApiId: !Ref ApiGateway
-      Description: "Deployment for API Gateway"
-      
-  # 明示的なステージ作成
-  ApiStage:
-    Type: AWS::ApiGateway::Stage
-    DependsOn: ApiDeployment
-    Properties:
-      DeploymentId: !Ref ApiDeployment
-      RestApiId: !Ref ApiGateway
-      StageName: !Sub "${Environment}-custom-v2"
-      MethodSettings:
-        - LoggingLevel: INFO
-          ResourcePath: '/*'
-          HttpMethod: '*'
-          DataTraceEnabled: true
-
   # Base path mapping
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
-    DependsOn: 
-      - ApiGateway
-      - ApiCustomDomain
-      - ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
-      Stage: !Sub "${Environment}-custom-v2"
+      Stage: !Sub "${Environment}-v2"
       BasePath: api
 
   # DNS A Record
@@ -170,63 +137,6 @@ Resources:
       AliasTarget:
         DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
         HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
-
-  # 明示的に/callbackリソースを定義
-  CallbackResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ParentId: !GetAtt ApiGateway.RootResourceId
-      PathPart: "callback"
-      
-  # OPTIONS メソッドを明示的に定義 (修正版)
-  CallbackOptionsMethod:
-    Type: AWS::ApiGateway::Method
-    DependsOn: CallbackResource
-    Properties:
-      HttpMethod: OPTIONS
-      ResourceId: !Ref CallbackResource
-      RestApiId: !Ref ApiGateway
-      AuthorizationType: NONE
-      ApiKeyRequired: false
-      Integration:
-        Type: MOCK
-        IntegrationHttpMethod: OPTIONS
-        PassthroughBehavior: WHEN_NO_MATCH
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-              method.response.header.Access-Control-Allow-Credentials: "'true'"
-            ResponseTemplates:
-              application/json: '{}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Credentials: true
-
-  # 明示的なPOSTメソッドの追加
-  CallbackPostMethod:
-    Type: AWS::ApiGateway::Method
-    DependsOn: CallbackResource
-    Properties:
-      HttpMethod: POST
-      ResourceId: !Ref CallbackResource
-      RestApiId: !Ref ApiGateway
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations
-      MethodResponses:
-        - StatusCode: 200
 
   HelloWorldFunction:
     Type: AWS::Serverless::Function
@@ -286,6 +196,19 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
+      Events:
+        Callback:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: POST
+            RestApiId: !Ref ApiGateway
+        CallbackOptions:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: OPTIONS
+            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -297,15 +220,6 @@ Resources:
           COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolID
           COGNITO_CALLBACK_URL: !Ref CognitoCallbackURL
-
-  # Lambda実行権限
-  CallbackFunctionPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref CallbackFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/callback
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
@@ -332,7 +246,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-custom-v2/
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-v2/
 
   CustomDomainUrl:
     Description: Custom domain URL
@@ -344,4 +258,4 @@ Outputs:
 
   ApiGatewayRestApiStage:
     Description: API Gateway REST API Stage
-    Value: !Sub "${Environment}-custom-v2"
+    Value: !Sub "${Environment}-v2"
