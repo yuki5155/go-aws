@@ -241,8 +241,6 @@ Resources:
             Path: /callback
             Method: POST
             RestApiId: !Ref ApiGateway
-            Auth:
-              Authorizer: NONE
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
