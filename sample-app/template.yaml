@@ -77,7 +77,7 @@ Resources:
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
-        - '*/*'
+        - 'image/*'
       # Open API定義を使用して詳細に設定
       DefinitionBody:
         swagger: "2.0"
