@@ -72,41 +72,17 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: dummy-stage  # ダミーのステージ名（使用しない）
+      StageName: !Sub "${Environment}-v2"
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
         - '*/*'
-      # CORSを有効化
+      # CORSは無効化（Lambda内で処理する）
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: "'*'"
+        AllowOrigin: !Sub "'${AllowOrigin}'"
         AllowCredentials: true
-        MaxAge: "'600'"
-
-  # Gateway Responses for CORS
-  Gateway4XXResponse:
-    Type: AWS::ApiGateway::GatewayResponse
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: DEFAULT_4XX
-      RestApiId: !Ref ApiGateway
-
-  Gateway5XXResponse:
-    Type: AWS::ApiGateway::GatewayResponse
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: DEFAULT_5XX
-      RestApiId: !Ref ApiGateway
 
   # Custom domain
   ApiCustomDomain:
@@ -119,36 +95,9 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
-  # 明示的なデプロイメント
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - HelloWorldFunction
-      - HelloWorldPostFunction
-      - CallbackFunction
-      - Gateway4XXResponse
-      - Gateway5XXResponse
-    Properties:
-      RestApiId: !Ref ApiGateway
-      Description: "API Gateway Deployment"
-
-  # 明示的なステージ
-  ApiStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      DeploymentId: !Ref ApiDeployment
-      RestApiId: !Ref ApiGateway
-      StageName: !Sub "${Environment}-v2"
-      MethodSettings:
-        - LoggingLevel: INFO
-          ResourcePath: '/*'
-          HttpMethod: '*'
-          DataTraceEnabled: true
-
   # Base path mapping
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
-    DependsOn: ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
@@ -225,11 +174,17 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        Callback:
+        CallbackPost:
           Type: Api
           Properties:
             Path: /callback
             Method: POST
+            RestApiId: !Ref ApiGateway
+        CallbackOptions:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: OPTIONS
             RestApiId: !Ref ApiGateway
       Environment:
         Variables:
