@@ -75,6 +75,30 @@ Resources:
       StageName: dev-internal # 内部用ステージ名（実際には使用しない）
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
+      BinaryMediaTypes:
+        - '*/*'
+      # CORSを静的に設定
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: !Sub "'${AllowOrigin}'"
+        AllowCredentials: true
+      # すべてのエンドポイントでOPTIONSを許可
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+            gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+            gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
       # シンプルなCORS設定
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
@@ -122,6 +146,7 @@ Resources:
     Type: AWS::ApiGateway::BasePathMapping
     DependsOn: 
       - ApiCustomStage
+      - ApiGateway
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
@@ -139,28 +164,7 @@ Resources:
         DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
         HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
 
-  # CORS用のGatewayResponse
-  GatewayResponse4XX:
-    Type: 'AWS::ApiGateway::GatewayResponse'
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: DEFAULT_4XX
-      RestApiId: !Ref ApiGateway
-
-  GatewayResponse5XX:
-    Type: 'AWS::ApiGateway::GatewayResponse'
-    Properties:
-      ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
-      ResponseType: DEFAULT_5XX
-      RestApiId: !Ref ApiGateway
+  # CORS用のGatewayResponse（GatewayResponsesで統合したため削除）
 
   HelloWorldFunction:
     Type: AWS::Serverless::Function
@@ -226,12 +230,6 @@ Resources:
           Properties:
             Path: /callback
             Method: POST
-            RestApiId: !Ref ApiGateway
-        CallbackOptions:
-          Type: Api
-          Properties:
-            Path: /callback
-            Method: OPTIONS
             RestApiId: !Ref ApiGateway
       Environment:
         Variables:
