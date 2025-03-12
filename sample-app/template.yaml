@@ -68,11 +68,34 @@ Globals:
     Tracing: Active
 
 Resources:
-  # API Gateway定義
+  # 明示的なデプロイメント定義
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - HelloWorldFunction
+      - HelloWorldPostFunction
+      - CallbackFunction
+    Properties:
+      RestApiId: !Ref ApiGateway
+      Description: "API Gateway Deployment"
+
+  # 明示的なステージ定義
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref ApiGateway
+      StageName: !Sub "${Environment}-v3"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
+
+  # API Gateway定義 - ダミーステージを使用
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Sub "${Environment}-v3"
+      StageName: dummy
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
@@ -98,6 +121,7 @@ Resources:
   # Base path mapping
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
