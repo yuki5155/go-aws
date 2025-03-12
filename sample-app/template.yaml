@@ -80,7 +80,7 @@ Resources:
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: !Ref AllowOrigin
+        AllowOrigin: !Sub "'${AllowOrigin}'"
         AllowCredentials: true
       # Swagger/OpenAPI定義を直接埋め込む
       DefinitionBody:
@@ -256,6 +256,8 @@ Resources:
       - HelloGet
       - HelloWorldPostFunction
       - CallbackFunction
+      - GatewayResponse4XX
+      - GatewayResponse5XX
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -266,7 +268,12 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      StageName: !Sub "${Environment}-apigw-1" 
+      StageName: !Ref Environment
+      MethodSettings:
+        - LoggingLevel: INFO
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          DataTraceEnabled: true
 
   # Base path mapping (use the new ApiGateway resource)
   ApiBasePath:
@@ -378,6 +385,8 @@ Resources:
             Path: /callback
             Method: POST
             RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: NONE
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
