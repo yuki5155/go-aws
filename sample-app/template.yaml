@@ -123,7 +123,6 @@ Resources:
       - HelloWorldFunction
       - HelloWorldPostFunction
       - CallbackFunction
-      - CallbackOptionsMethod
       - Gateway4XXResponse
       - Gateway5XXResponse
     Properties:
