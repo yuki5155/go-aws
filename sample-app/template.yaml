@@ -1,4 +1,18 @@
-AWSTemplateFormatVersion: '2010-09-09'
+# 明示的なPOSTメソッドの追加
+  CallbackPostMethod:
+    Type: AWS::ApiGateway::Method
+    DependsOn: CallbackResource
+    Properties:
+      HttpMethod: POST
+      ResourceId: !Ref CallbackResource
+      RestApiId: !Ref ApiGateway
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations
+      MethodResponses:
+        - StatusCode: 200AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   sample-app
@@ -123,6 +137,7 @@ Resources:
       - HelloWorldFunction
       - HelloWorldPostFunction
       - CallbackFunction
+      - CallbackOptionsMethod
       - Gateway4XXResponse
       - Gateway5XXResponse
     Properties:
@@ -233,13 +248,7 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
-      Events:
-        Callback:
-          Type: Api
-          Properties:
-            Path: /callback
-            Method: POST
-            RestApiId: !Ref ApiGateway
+      # Lambdaへの直接のAPIイベントを削除（明示的なメソッドを使用）
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
