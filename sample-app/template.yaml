@@ -68,44 +68,103 @@ Globals:
     Tracing: Active
 
 Resources:
-  # 明示的なデプロイメント定義
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - HelloWorldFunction
-      - HelloWorldPostFunction
-      - CallbackFunction
-    Properties:
-      RestApiId: !Ref ApiGateway
-      Description: "API Gateway Deployment"
-
-  # 明示的なステージ定義
-  ApiStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      DeploymentId: !Ref ApiDeployment
-      RestApiId: !Ref ApiGateway
-      StageName: !Sub "${Environment}-v3"
-      MethodSettings:
-        - ResourcePath: "/*"
-          HttpMethod: "*"
-          LoggingLevel: INFO
-
-  # API Gateway定義 - ダミーステージを使用
+  # API Gateway定義
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
+      # ダミーステージ名を使用
       StageName: dummy
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
         - '*/*'
-      # CORSは無効化（Lambda内で処理する）
-      Cors:
-        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: !Sub "'${AllowOrigin}'"
-        AllowCredentials: true
+      # Open API定義を使用して詳細に設定
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          title: !Sub "Sample API - ${Environment}"
+        paths:
+          /hello:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "200":
+                  description: "200 response"
+          /hello-post:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "200":
+                  description: "200 response"
+          /callback:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+              responses:
+                "200":
+                  description: "200 response"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Access-Control-Allow-Credentials:
+                      type: "string"
+              # MOCKインテグレーションを使用して直接APIゲートウェイでOPTIONSを処理
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: !Sub "'${AllowOrigin}'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+  # 明示的なステージとデプロイメント
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGateway
+    Properties:
+      RestApiId: !Ref ApiGateway
+      Description: "API Gateway Deployment"
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref ApiGateway
+      StageName: !Sub "${Environment}-v4"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
 
   # Custom domain
   ApiCustomDomain:
@@ -125,7 +184,7 @@ Resources:
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
-      Stage: !Sub "${Environment}-v3"
+      Stage: !Sub "${Environment}-v4"
       BasePath: api
 
   # DNS A Record
@@ -149,13 +208,6 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
-      Events:
-        HelloGet:
-          Type: Api
-          Properties:
-            Path: /hello
-            Method: GET
-            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -173,13 +225,6 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
-      Events:
-        HelloPost:
-          Type: Api
-          Properties:
-            Path: /hello-post
-            Method: POST
-            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -197,19 +242,6 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
-      Events:
-        CallbackPost:
-          Type: Api
-          Properties:
-            Path: /callback
-            Method: POST
-            RestApiId: !Ref ApiGateway
-        CallbackOptions:
-          Type: Api
-          Properties:
-            Path: /callback
-            Method: OPTIONS
-            RestApiId: !Ref ApiGateway
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -221,6 +253,31 @@ Resources:
           COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolID
           COGNITO_CALLBACK_URL: !Ref CognitoCallbackURL
+
+  # Lambda実行権限
+  HelloWorldPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref HelloWorldFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/hello
+
+  HelloWorldPostPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref HelloWorldPostFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/hello-post
+
+  CallbackFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CallbackFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/callback
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
@@ -247,7 +304,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-v3/
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-v4/
 
   CustomDomainUrl:
     Description: Custom domain URL
@@ -259,4 +316,4 @@ Outputs:
 
   ApiGatewayRestApiStage:
     Description: API Gateway REST API Stage
-    Value: !Sub "${Environment}-v3"
+    Value: !Sub "${Environment}-v4"
