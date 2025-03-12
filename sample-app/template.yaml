@@ -72,7 +72,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: dev-internal # 内部用ステージ名（実際には使用しない）
+      StageName: !Sub "${Environment}-custom" # 直接本番ステージ名を使用
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
@@ -118,20 +118,7 @@ Resources:
           - REGIONAL
       SecurityPolicy: TLS_1_2
 
-  # API Stage - ユニークな名前に変更
-  ApiCustomStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      RestApiId: !Ref ApiGateway
-      DeploymentId: !Ref ApiDeployment
-      StageName: !Sub "${Environment}-custom"
-      MethodSettings:
-        - LoggingLevel: INFO
-          ResourcePath: '/*'
-          HttpMethod: '*'
-          DataTraceEnabled: true
-
-  # Create an explicit API Deployment
+  # デプロイメントを作成
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -139,6 +126,7 @@ Resources:
       - HelloWorldPostFunction
       - CallbackFunction
       - CallbackOptionsMethod
+      - CallbackPostMethod
       - Gateway4XXResponse
       - Gateway5XXResponse
     Properties:
@@ -149,8 +137,8 @@ Resources:
   ApiBasePath:
     Type: AWS::ApiGateway::BasePathMapping
     DependsOn: 
-      - ApiCustomStage
       - ApiGateway
+      - ApiCustomDomain
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
@@ -176,7 +164,7 @@ Resources:
       ParentId: !GetAtt ApiGateway.RootResourceId
       PathPart: "callback"
       
-  # OPTIONS メソッドを明示的に定義
+  # OPTIONS メソッドを明示的に定義 (修正版)
   CallbackOptionsMethod:
     Type: AWS::ApiGateway::Method
     DependsOn: CallbackResource
@@ -189,6 +177,7 @@ Resources:
       Integration:
         Type: MOCK
         IntegrationHttpMethod: OPTIONS
+        PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
         IntegrationResponses:
@@ -282,7 +271,6 @@ Resources:
       Runtime: provided.al2
       Architectures:
         - x86_64
-      # Lambdaへの直接のAPIイベントを削除（明示的なメソッドを使用）
       Environment:
         Variables:
           GOCACHE: /tmp/.cache/go-build
@@ -294,19 +282,6 @@ Resources:
           COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolID
           COGNITO_CALLBACK_URL: !Ref CognitoCallbackURL
-
-  # Create a logical ID for the API method that can be referenced in DependsOn
-  HelloGet:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGateway
-      ResourceId: !GetAtt ApiGateway.RootResourceId
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
 
   # Lambda実行権限
   CallbackFunctionPermission:
@@ -342,7 +317,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-custom/
 
   CustomDomainUrl:
     Description: Custom domain URL
