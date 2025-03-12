@@ -72,7 +72,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Sub "${Environment}-v2"
+      StageName: !Sub "${Environment}-v3"
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
       BinaryMediaTypes:
@@ -101,7 +101,7 @@ Resources:
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ApiGateway
-      Stage: !Sub "${Environment}-v2"
+      Stage: !Sub "${Environment}-v3"
       BasePath: api
 
   # DNS A Record
@@ -223,7 +223,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-v2/
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}-v3/
 
   CustomDomainUrl:
     Description: Custom domain URL
@@ -235,4 +235,4 @@ Outputs:
 
   ApiGatewayRestApiStage:
     Description: API Gateway REST API Stage
-    Value: !Sub "${Environment}-v2"
+    Value: !Sub "${Environment}-v3"
