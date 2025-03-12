@@ -77,12 +77,13 @@ Resources:
       TracingEnabled: true
       BinaryMediaTypes:
         - '*/*'
-      # CORSを静的に設定
+      # CORSを有効化
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: !Sub "'${AllowOrigin}'"
         AllowCredentials: true
+        MaxAge: "'600'"
 
   # Gateway Responses for CORS
   Gateway4XXResponse:
@@ -229,12 +230,6 @@ Resources:
           Properties:
             Path: /callback
             Method: POST
-            RestApiId: !Ref ApiGateway
-        CallbackOptions:
-          Type: Api
-          Properties:
-            Path: /callback
-            Method: OPTIONS
             RestApiId: !Ref ApiGateway
       Environment:
         Variables:
