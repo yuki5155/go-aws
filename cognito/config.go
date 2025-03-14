@@ -50,7 +50,7 @@ func GetTokens(code, redirectURI string, config CognitoConfig) (*TokenResponse, 
 
 	req, err := http.NewRequest("POST", tokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, NewInvalidRequestError("failed to create request", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -61,17 +61,17 @@ func GetTokens(code, redirectURI string, config CognitoConfig) (*TokenResponse, 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("token request failed: %w", err)
+		return nil, NewRequestFailedError("token request failed", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get token: status code %s", resp.Status)
+		return nil, NewRequestFailedError(fmt.Sprintf("failed to get token: status code %s", resp.Status), nil)
 	}
 
 	var tokenResp TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse token response: %w", err)
+		return nil, NewParsingFailedError("failed to parse token response", err)
 	}
 
 	return &tokenResp, nil
@@ -82,34 +82,34 @@ func ValidateIDToken(idToken string, config CognitoConfig) (bool, JWTClaims, err
 	// Parse JWT token manually (no external dependencies)
 	parts := strings.Split(idToken, ".")
 	if len(parts) != 3 {
-		return false, nil, fmt.Errorf("invalid token format")
+		return false, nil, NewInvalidTokenError("invalid token format", nil)
 	}
 
 	// Decode claims
 	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to decode token payload: %w", err)
+		return false, nil, NewParsingFailedError("failed to decode token payload", err)
 	}
 
 	var claims JWTClaims
 	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
-		return false, nil, fmt.Errorf("failed to parse token claims: %w", err)
+		return false, nil, NewParsingFailedError("failed to parse token claims", err)
 	}
 
 	// Get token issuer
 	issuer, _ := claims["iss"].(string)
 	if issuer == "" {
-		return false, nil, fmt.Errorf("missing issuer claim")
+		return false, nil, NewValidationFailedError("missing issuer claim")
 	}
 
 	// Check expiration
 	exp, ok := claims["exp"].(float64)
 	if !ok {
-		return false, nil, fmt.Errorf("invalid expiration claim")
+		return false, nil, NewValidationFailedError("invalid expiration claim")
 	}
 
 	if time.Now().Unix() > int64(exp) {
-		return false, claims, fmt.Errorf("token expired")
+		return false, claims, NewTokenExpiredError()
 	}
 
 	// Determine user pool ID if not provided
@@ -130,14 +130,14 @@ func ValidateIDToken(idToken string, config CognitoConfig) (bool, JWTClaims, err
 
 	// For Cognito tokens
 	if userPoolID == "" {
-		return false, nil, fmt.Errorf("could not determine user pool ID")
+		return false, nil, NewUserPoolError("could not determine user pool ID")
 	}
 
 	// For ID tokens, we need to use AdminGetUser or GetUser
 	// Use the 'sub' claim to identify the user
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		return false, claims, fmt.Errorf("missing subject claim")
+		return false, claims, NewValidationFailedError("missing subject claim")
 	}
 
 	// When using the SDK for full validation (not in this simplified version):
@@ -152,7 +152,7 @@ func ValidateIDToken(idToken string, config CognitoConfig) (bool, JWTClaims, err
 	// For ID tokens, this is a minimal validation
 	audience, _ := claims["aud"].(string)
 	if audience != config.ClientID {
-		return false, claims, fmt.Errorf("invalid audience")
+		return false, claims, NewValidationFailedError("invalid audience")
 	}
 
 	return true, claims, nil
@@ -168,7 +168,7 @@ func GetUserAttributes(accessToken string, config CognitoConfig, awsConf aws.Con
 
 	result, err := cognitoClient.GetUser(context.Background(), input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user attributes: %w", err)
+		return nil, NewRequestFailedError("failed to get user attributes", err)
 	}
 
 	attributes := make(map[string]string)
@@ -186,7 +186,7 @@ func RefreshTokens(refreshToken string, cognitoConfig CognitoConfig) (*TokenResp
 		config.WithRegion(cognitoConfig.Region),
 	)
 	if err != nil {
-		return nil, err
+		return nil, NewInvalidRequestError("failed to load AWS config", err)
 	}
 
 	cognitoClient := cognitoidentityprovider.NewFromConfig(awsCfg)
@@ -206,7 +206,7 @@ func RefreshTokens(refreshToken string, cognitoConfig CognitoConfig) (*TokenResp
 
 	result, err := cognitoClient.InitiateAuth(context.Background(), input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to refresh token: %w", err)
+		return nil, NewAuthFailedError("failed to refresh token", err)
 	}
 
 	response := &TokenResponse{
