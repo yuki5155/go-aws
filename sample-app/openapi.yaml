@@ -138,6 +138,83 @@ paths:
         passthroughBehavior: when_no_match
         httpMethod: POST
         type: aws_proxy
+  /users/get:
+    get:
+      summary: Returns user information
+      description: Returns information about a user including userid, email, and username
+      operationId: getUser
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userid:
+                    type: string
+                    description: User ID
+                  email:
+                    type: string
+                    description: User's email address
+                  username:
+                    type: string
+                    description: User's username
+        '400':
+          description: Invalid request format
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+      x-amazon-apigateway-integration:
+        uri: 
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUserFunction.Arn}/invocations"
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        type: aws_proxy
+    options:
+      summary: CORS support for users/get
+      description: Enable CORS by returning correct headers
+      operationId: corsUsersGet
+      responses:
+        '200':
+          description: CORS support enabled
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+            Access-Control-Allow-Credentials:
+              schema:
+                type: string
+            Access-Control-Max-Age:
+              schema:
+                type: string
+          content: {}
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: |
+            {
+              "statusCode": 200
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+              method.response.header.Access-Control-Max-Age: "'7200'"
+            responseTemplates:
+              application/json: |
+                {}
 components:
   securitySchemes:
     CognitoAuth:

@@ -265,6 +265,8 @@ Resources:
       - HelloGet
       - HelloWorldPostFunction
       - CallbackFunction
+      - GetUserFunction
+      - GetUserMethod
     Properties:
       RestApiId: !Ref ApiGateway
       Description: "Deployment for API Gateway"
@@ -411,6 +413,43 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
+
+  # GetUser function
+  GetUserFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: get-user/
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+        - x86_64
+      Events:
+        GetUser:
+          Type: Api
+          Properties:
+            Path: /users/get
+            Method: GET
+            RestApiId: !Ref ApiGateway
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+          ALLOW_ORIGIN: !Ref AllowOrigin
+  
+  # Create a logical ID for the API method that can be referenced in DependsOn
+  GetUserMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUserFunction.Arn}/invocations"
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group

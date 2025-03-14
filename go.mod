@@ -1,6 +1,6 @@
 module github.com/yuki5155/go-aws
 
-go 1.23.4
+go 1.22
 
 require (
 	github.com/aws/aws-lambda-go v1.47.0
