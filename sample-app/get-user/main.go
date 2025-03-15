@@ -28,6 +28,48 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		userID = "default-user-id"
 	}
 
+	// If using the Cognito middleware, we can get the user data from the request headers
+	cognitoUserID := request.Headers["X-Cognito-User-ID"]
+	cognitoUsername := request.Headers["X-Cognito-Username"]
+	cognitoEmail := request.Headers["X-Cognito-Email"]
+
+	// If we have Cognito user data, use it instead of the mock data
+	if cognitoUserID != "" {
+		user := User{
+			ID:       cognitoUserID,
+			Username: cognitoUsername,
+			Email:    cognitoEmail,
+		}
+
+		log.Printf("Using Cognito user data: %+v", user)
+
+		// Convert the user to JSON
+		userJSON, err := json.Marshal(user)
+		if err != nil {
+			return events.APIGatewayProxyResponse{
+				StatusCode: 500,
+				Body:       fmt.Sprintf("Error converting user to JSON: %v", err),
+			}, nil
+		}
+
+		allowOrigin := os.Getenv("ALLOW_ORIGIN")
+		if allowOrigin == "" {
+			allowOrigin = "https://mydevportal.com" // Default value
+		}
+		fmt.Println("allowOrigin", allowOrigin)
+
+		return events.APIGatewayProxyResponse{
+			Body:       string(userJSON),
+			StatusCode: 200,
+			Headers: map[string]string{
+				"Content-Type":                     "application/json",
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Allow-Origin":      allowOrigin,
+			},
+		}, nil
+	}
+
+	// Fallback to mock user data if no Cognito data
 	user := User{
 		ID:       userID,
 		Username: "testuser",
@@ -65,6 +107,7 @@ func main() {
 	handlerWithMiddleware := middlewares.Chain(
 		handler,
 		middlewares.LoggingMiddleware(),
+		middlewares.CognitoAuthMiddleware(),
 	)
 	lambda.Start(handlerWithMiddleware)
 }
