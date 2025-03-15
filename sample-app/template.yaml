@@ -138,6 +138,55 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
+          /users/get:
+            options:
+              summary: CORS support for users/get endpoint
+              description: Enable CORS by returning correct headers
+              responses:
+                '200':
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Credentials:
+                      schema:
+                        type: boolean
+                  content: {}
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: |
+                    {
+                      "statusCode": 200
+                    }
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'https://mydevportal.com'"
+                      method.response.header.Access-Control-Allow-Credentials: "'true'"
+                    responseTemplates:
+                      application/json: |
+                        {}
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "aws_proxy"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUserFunction.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+              responses:
+                "200":
+                  description: "200 response"
           /hello-post:
             options:
               summary: CORS support for hello-post endpoint
@@ -411,6 +460,29 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations"
+
+  GetUserFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: get-user/
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+        - x86_64
+      Events:
+        GetUser:
+          Type: Api
+          Properties:
+            Path: /users/get
+            Method: GET
+            RestApiId: !Ref ApiGateway
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+          ALLOW_ORIGIN: !Ref AllowOrigin
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
