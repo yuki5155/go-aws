@@ -483,6 +483,11 @@ Resources:
           GOCACHE: /tmp/.cache/go-build
           GOPATH: /tmp/go
           ALLOW_ORIGIN: !Ref AllowOrigin
+          COGNITO_DOMAIN: !Ref CognitoDomain
+          COGNITO_CLIENT_ID: !Ref CognitoClientID
+          COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolID
+          COGNITO_CALLBACK_URL: !Ref CognitoCallbackURL
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
