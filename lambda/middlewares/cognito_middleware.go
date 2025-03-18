@@ -1,13 +1,18 @@
 package middlewares
 
 import (
+	"fmt"
 	"log"
 
+	"os"
+
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/yuki5155/go-aws/cognito"
+	"github.com/yuki5155/go-aws/lambda/utils"
 )
 
 // CognitoDummyUser represents user data that would come from Cognito
-type CognitoDummyUser struct {
+type CognitoUser struct {
 	UserID    string
 	Username  string
 	Email     string
@@ -23,30 +28,85 @@ func CognitoAuthMiddleware() Middleware {
 		log.Println("Setting up Cognito auth handler wrapper")
 
 		return func(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-			// For now, we're just adding dummy Cognito user data
-			log.Printf("Adding dummy Cognito user data to request: %s", req.RequestContext.RequestID)
+			log.Printf("Processing request with Cognito auth: %s", req.RequestContext.RequestID)
 
-			// In a real implementation, we would:
-			// 1. Extract the JWT token from the Authorization header
-			// 2. Validate the token with Cognito
-			// 3. Extract user info from the token
-			// 4. Add the user info to the request context
+			// Extract ID token from cookies
+			idToken := utils.GetCookieByName(req, "id_token")
+			if idToken == "" {
+				log.Println("No ID token found in request cookies")
+				return events.APIGatewayProxyResponse{
+					StatusCode: 401,
+					Body:       `{"message":"Unauthorized: No valid token provided"}`,
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+				}, nil
+			}
 
-			// For now, we'll just add some dummy data to the request context via headers
-			// In a real implementation, you'd use context.WithValue, but for Lambda we need to work with the request object
+			// Create Cognito configuration
+			cognitoConfig := cognito.CognitoConfig{
+				Domain:       os.Getenv("COGNITO_DOMAIN"),
+				Region:       os.Getenv("AWS_REGION"),
+				ClientID:     os.Getenv("COGNITO_CLIENT_ID"),
+				ClientSecret: os.Getenv("COGNITO_CLIENT_SECRET"),
+				UserPoolID:   os.Getenv("COGNITO_USER_POOL_ID"),
+			}
 
-			// We'll store our dummy user data in the request headers for demonstration
-			// In a real implementation, you'd want to modify the actual context or create a custom request object
+			// Validate the ID token
+			isValid, claims, err := cognito.ValidateIDToken(idToken, cognitoConfig)
+			if err != nil {
+				log.Printf("Token validation error: %v", err)
+				return events.APIGatewayProxyResponse{
+					StatusCode: 401,
+					Body:       `{"message":"Unauthorized: Invalid token"}`,
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+				}, nil
+			}
+
+			if !isValid {
+				log.Println("Token is not valid")
+				return events.APIGatewayProxyResponse{
+					StatusCode: 401,
+					Body:       `{"message":"Unauthorized: Token validation failed"}`,
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+				}, nil
+			}
+			fmt.Println(claims)
+
+			// Extract user info from claims
+			user := CognitoUser{}
+
+			// Extract standard claims
+			if sub, ok := claims["sub"].(string); ok {
+				user.UserID = sub
+			}
+			if email, ok := claims["email"].(string); ok {
+				user.Email = email
+			}
+			if username, ok := claims["cognito:username"].(string); ok {
+				user.Username = username
+			}
+			// Extract groups if available
+			if cognitoGroups, ok := claims["cognito:groups"].([]interface{}); ok {
+				for _, group := range cognitoGroups {
+					if groupStr, ok := group.(string); ok {
+						user.Groups = append(user.Groups, groupStr)
+					}
+				}
+			}
+
+			// Add user info to request headers for passing to the next handler
 			if req.Headers == nil {
 				req.Headers = make(map[string]string)
 			}
 
-			// Add dummy user data to headers
-			// This is just for demonstration - in a real implementation, you'd use proper context management
-			req.Headers["X-Cognito-User-ID"] = "dummy-user-123"
-			req.Headers["X-Cognito-Username"] = "dummy-user"
-			req.Headers["X-Cognito-Email"] = "dummy@example.com"
-			req.Headers["X-Cognito-Groups"] = "admin,users"
+			req.Headers["X-Cognito-User-ID"] = user.UserID
+			req.Headers["X-Cognito-Username"] = user.Username
+			req.Headers["X-Cognito-Email"] = user.Email
 
 			// Process the request with the next handler
 			resp, err := next(req)
