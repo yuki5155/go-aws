@@ -31,7 +31,8 @@ func CognitoAuthMiddleware() Middleware {
 			log.Printf("Processing request with Cognito auth: %s", req.RequestContext.RequestID)
 
 			// Extract ID token from cookies
-			idToken := utils.GetCookieByName(req, "id_token")
+			idToken := utils.GetCookieByName(req, "idToken")
+			log.Printf("ID token: %s", idToken)
 			if idToken == "" {
 				log.Println("No ID token found in request cookies")
 				return events.APIGatewayProxyResponse{
