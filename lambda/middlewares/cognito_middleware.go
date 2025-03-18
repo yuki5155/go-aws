@@ -78,9 +78,7 @@ func CognitoAuthMiddleware() Middleware {
 			fmt.Println(claims)
 
 			// Extract user info from claims
-			user := CognitoUser{
-				TokenData: claims,
-			}
+			user := CognitoUser{}
 
 			// Extract standard claims
 			if sub, ok := claims["sub"].(string); ok {
