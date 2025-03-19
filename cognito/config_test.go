@@ -190,3 +190,32 @@ func TestGetTokensAndVerify(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateIDToken(t *testing.T) {
+	config := CognitoConfig{
+		Domain:       os.Getenv("COGNITO_DOMAIN"),
+		Region:       os.Getenv("AWS_REGION"),
+		ClientID:     os.Getenv("COGNITO_CLIENT_ID"),
+		ClientSecret: os.Getenv("COGNITO_CLIENT_SECRET"),
+		UserPoolID:   os.Getenv("COGNITO_USER_POOL_ID"),
+	}
+	idToken := "eyJraWQiOiJVaHJjQXBuV2xQcXd6bkQyRWQzTERlSERleDJPUTg4MENPNHZ1Rk9oRmlvPSIsImFsZyI6IlJTMjU2In0.eyJhdF9oYXNoIjoid2RHMVhiYkpmdjJ5R0lIcEpuTEl2ZyIsInN1YiI6ImY3MTQ1YWE4LWUwNDEtNzBhZi1hZDJmLTgwNzI3OTE1ODU3MSIsImNvZ25pdG86Z3JvdXBzIjpbImFwLW5vcnRoZWFzdC0xXzNnY0Y1M09ENF9Hb29nbGUiXSwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtbm9ydGhlYXN0LTEuYW1hem9uYXdzLmNvbVwvYXAtbm9ydGhlYXN0LTFfM2djRjUzT0Q0IiwiY29nbml0bzp1c2VybmFtZSI6Ikdvb2dsZV8xMTE2MzQ5NDY4Nzg4NTk2NTczOTQiLCJnaXZlbl9uYW1lIjoiWXVraSIsInBpY3R1cmUiOiJodHRwczpcL1wvbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbVwvYVwvQUNnOG9jS2lQVWZQZ2QwOVMyOFpteDVibVdXM1lNNmZvMzZrYTFGX0gzY1J1NEFZTU1UMi13PXM5Ni1jIiwib3JpZ2luX2p0aSI6IjUyNDM1ZDA5LWIyNWEtNDRlYi05ZjE1LTgyODE4MWE0OTNmYSIsImF1ZCI6IjNtdmM1aGJvODJxZWF0aHI3cDRqZTc3MjMiLCJpZGVudGl0aWVzIjpbeyJkYXRlQ3JlYXRlZCI6IjE3NDA1MDM3ODM3ODIiLCJ1c2VySWQiOiIxMTE2MzQ5NDY4Nzg4NTk2NTczOTQiLCJwcm92aWRlck5hbWUiOiJHb29nbGUiLCJwcm92aWRlclR5cGUiOiJHb29nbGUiLCJpc3N1ZXIiOm51bGwsInByaW1hcnkiOiJ0cnVlIn1dLCJ0b2tlbl91c2UiOiJpZCIsImF1dGhfdGltZSI6MTc0MjMxMTM0OCwibmFtZSI6Ill1a2kgQXNhbm8gKFkuQSkiLCJleHAiOjE3NDIzMTQ5NDgsImlhdCI6MTc0MjMxMTM0OSwiZmFtaWx5X25hbWUiOiJBc2FubyIsImp0aSI6IjRiZTRjYzQ1LTVkODMtNGM0ZC04YjAyLWFiYTdlMzJmYWZiYyIsImVtYWlsIjoieXVraWFzYW5vNTVAZ21haWwuY29tIn0.xhc9JaPcnWz1zl8Ua2jKpQXr-hGXTA_p0r7_6W-erTpyos-87ZJw8peLKcxufTRvTaqIUYJa0YthZ7ZCV0j_PXd2VofNFd4DCzodFICwPvcbb2d-sR3oaIw1SwcteLy2Vxdswn_mfltSC6iWsFxQjBknnX4XGeTW8R7WUNFtJu15pry0NhQpN81JmZy-qAOdXkpBwU93ZVGw9Pgr9nMsCfdjHu9G-S70YeSEwG47H3ZEgRcsahGI9ARRhceQvGubImYg477CSUHxOfXKNr5VhdOXrYZnl1QUnRj59mWMmACgNDBsFiUEDjUf-4HXHIN49vGQvtX3qbLxvD4XGmZlEA"
+	isValid, claims, err := ValidateIDToken(idToken, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("Token valid: %v\n", isValid)
+	if claims != nil {
+		fmt.Println("\nToken claims:")
+		// Print important claims
+		if sub, ok := claims["sub"].(string); ok {
+			fmt.Printf("Subject (sub): %s\n", sub)
+		}
+		if email, ok := claims["email"].(string); ok {
+			fmt.Printf("Email: %s\n", email)
+		}
+		if name, ok := claims["name"].(string); ok {
+			fmt.Printf("Name: %s\n", name)
+		}
+	}
+}
