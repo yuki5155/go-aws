@@ -31,23 +31,23 @@ Parameters:
     Type: String
     Description: CORS allow origin
     Default: https://mydevportal.com
-  COGNITO_DOMAIN:
+  CognitoDomain:
     Type: String
     Description: Cognito domain name
     Default: ''
-  COGNITO_CLIENT_ID:
+  CognitoClientID:
     Type: String
     Description: Cognito app client ID
     Default: ''
-  COGNITO_CLIENT_SECRET:
+  CognitoClientSecret:
     Type: String
     Description: Cognito app client secret
     Default: ''
-  COGNITO_USER_POOL_ID:
+  CognitoUserPoolID:
     Type: String
     Description: Cognito user pool ID
     Default: ''
-  COGNITO_CALLBACK_URL:
+  CognitoCallbackURL:
     Type: String
     Description: Cognito callback URL
     Default: ''
@@ -71,10 +71,209 @@ Resources:
         AllowOrigin: '''https://mydevportal.com'''
         AllowCredentials: true
       DefinitionBody:
-        Fn::Transform:
-          Name: AWS::Include
-          Parameters:
-            Location: ../../openapi.yaml
+        openapi: 3.0.1
+        info:
+          title: API Gateway
+          version: '1.0'
+        paths:
+          /hello:
+            options:
+              summary: CORS support for hello endpoint
+              description: Enable CORS by returning correct headers
+              responses:
+                '200':
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Credentials:
+                      schema:
+                        type: boolean
+                  content: {}
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\": 200\n}\n"
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Methods: '''GET,POST,PUT,DELETE,OPTIONS'''
+                      method.response.header.Access-Control-Allow-Origin: '''https://mydevportal.com'''
+                      method.response.header.Access-Control-Allow-Credentials: '''true'''
+                    responseTemplates:
+                      application/json: '{}
+
+                        '
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+              responses:
+                '200':
+                  description: 200 response
+          /users/get:
+            options:
+              summary: CORS support for users/get endpoint
+              description: Enable CORS by returning correct headers
+              responses:
+                '200':
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Credentials:
+                      schema:
+                        type: boolean
+                  content: {}
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\": 200\n}\n"
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Methods: '''GET,POST,PUT,DELETE,OPTIONS'''
+                      method.response.header.Access-Control-Allow-Origin: '''https://mydevportal.com'''
+                      method.response.header.Access-Control-Allow-Credentials: '''true'''
+                    responseTemplates:
+                      application/json: '{}
+
+                        '
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUserFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+              responses:
+                '200':
+                  description: 200 response
+          /hello-post:
+            options:
+              summary: CORS support for hello-post endpoint
+              description: Enable CORS by returning correct headers
+              responses:
+                '200':
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Credentials:
+                      schema:
+                        type: boolean
+                  content: {}
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\": 200\n}\n"
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Methods: '''GET,POST,PUT,DELETE,OPTIONS'''
+                      method.response.header.Access-Control-Allow-Origin: '''https://mydevportal.com'''
+                      method.response.header.Access-Control-Allow-Credentials: '''true'''
+                    responseTemplates:
+                      application/json: '{}
+
+                        '
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldPostFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+              responses:
+                '200':
+                  description: 200 response
+          /callback:
+            options:
+              summary: CORS support for callback endpoint
+              description: Enable CORS by returning correct headers
+              responses:
+                '200':
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Credentials:
+                      schema:
+                        type: boolean
+                  content: {}
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\": 200\n}\n"
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Methods: '''GET,POST,PUT,DELETE,OPTIONS'''
+                      method.response.header.Access-Control-Allow-Origin: '''https://mydevportal.com'''
+                      method.response.header.Access-Control-Allow-Credentials: '''true'''
+                    responseTemplates:
+                      application/json: '{}
+
+                        '
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CallbackFunction.Arn}/invocations
+                passthroughBehavior: when_no_match
+              responses:
+                '200':
+                  description: 200 response
+        x-amazon-apigateway-binary-media-types:
+        - image/*
+        x-amazon-apigateway-cors:
+          allowOrigins:
+          - '''https://mydevportal.com'''
+          allowMethods:
+          - '''GET,POST,PUT,DELETE,OPTIONS'''
+          allowHeaders:
+          - '''Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'''
+          allowCredentials: true
   ApiCustomDomain:
     Type: AWS::ApiGateway::DomainName
     Properties:
@@ -238,15 +437,15 @@ Resources:
           ALLOW_ORIGIN:
             Ref: AllowOrigin
           COGNITO_DOMAIN:
-            Ref: COGNITO_DOMAIN
+            Ref: CognitoDomain
           COGNITO_CLIENT_ID:
-            Ref: COGNITO_CLIENT_ID
+            Ref: CognitoClientID
           COGNITO_CLIENT_SECRET:
-            Ref: COGNITO_CLIENT_SECRET
+            Ref: CognitoClientSecret
           COGNITO_USER_POOL_ID:
-            Ref: COGNITO_USER_POOL_ID
+            Ref: CognitoUserPoolID
           COGNITO_CALLBACK_URL:
-            Ref: COGNITO_CALLBACK_URL
+            Ref: CognitoCallbackURL
   HelloGet:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -263,6 +462,41 @@ Resources:
         IntegrationHttpMethod: POST
         Uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HelloWorldFunction.Arn}/invocations
+  GetUserFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+      SamResourceId: GetUserFunction
+    Properties:
+      CodeUri: GetUserFunction
+      Handler: bootstrap
+      Runtime: provided.al2
+      Architectures:
+      - x86_64
+      Events:
+        GetUser:
+          Type: Api
+          Properties:
+            Path: /users/get
+            Method: GET
+            RestApiId:
+              Ref: ApiGateway
+      Environment:
+        Variables:
+          GOCACHE: /tmp/.cache/go-build
+          GOPATH: /tmp/go
+          ALLOW_ORIGIN:
+            Ref: AllowOrigin
+          COGNITO_DOMAIN:
+            Ref: CognitoDomain
+          COGNITO_CLIENT_ID:
+            Ref: CognitoClientID
+          COGNITO_CLIENT_SECRET:
+            Ref: CognitoClientSecret
+          COGNITO_USER_POOL_ID:
+            Ref: CognitoUserPoolID
+          COGNITO_CALLBACK_URL:
+            Ref: CognitoCallbackURL
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:

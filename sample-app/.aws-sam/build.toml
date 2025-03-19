@@ -36,4 +36,16 @@ functions = ["CallbackFunction"]
 [function_build_definitions.a29b0b3e-f446-471f-a031-385019f9dda1.metadata]
 BuildMethod = "go1.x"
 
+[function_build_definitions.5c7773f2-ab73-4c24-bc07-4701bb67bc23]
+codeuri = "/workspaces/go-aws/sample-app/get-user"
+runtime = "provided.al2"
+architecture = "x86_64"
+handler = "bootstrap"
+manifest_hash = ""
+packagetype = "Zip"
+functions = ["GetUserFunction"]
+
+[function_build_definitions.5c7773f2-ab73-4c24-bc07-4701bb67bc23.metadata]
+BuildMethod = "go1.x"
+
 [layer_build_definitions]
